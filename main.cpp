@@ -36,7 +36,8 @@ int main() {
         output << std::endl;
     }
 
-    std::regex regex(R"delimiter(\s*^#include\s*(<(.+)>|"(.+)").*$)delimiter", std::regex::optimize);
+    std::regex angled_include_regex(R"delimiter(\s*^#include\s*(<(.+)>).*$)delimiter", std::regex::optimize);
+    std::regex quoted_include_regex(R"delimiter(\s*^#include\s*("(.+)").*$)delimiter", std::regex::optimize);
     for (std::filesystem::path source_path : source_paths) {
         for (std::filesystem::directory_entry entry :
             std::filesystem::directory_iterator(source_path)) {
@@ -47,18 +48,24 @@ int main() {
                     entry.path().extension() == ".cxx" ||
                     entry.path().extension() == ".cc")) {
                 auto object_path = (std::filesystem::path(artifact_path) / entry.path()).replace_extension(".o");
-                output << object_path << ": ";
+                output << object_path.string() << ": " << entry.path().string();
 
                 std::ifstream source_file(entry.path());
                 for (std::string line; std::getline(source_file, line);) {
                     std::smatch matches;
-                    if (std::regex_match(line, matches, regex)) {
+                    if (std::regex_match(line, matches, angled_include_regex) ||
+                        std::regex_match(line, matches, quoted_include_regex)) {
                         for (std::filesystem::path include_path : include_paths) {
-                            if (std::filesystem::is_regular_file(include_path / std::filesystem::path(matches[2]))) {
+                            auto header_path = include_path / std::filesystem::path(matches[2]);
+                            if (std::filesystem::is_regular_file(header_path)) {
+                                output << ' ' << header_path.string();
                             }
                         }
                     }
                 }
+
+                output << std::endl;
+                output << "\t$(CXX) -c $< \n"
             }
         }
     }

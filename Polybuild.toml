@@ -1,6 +1,7 @@
 [paths]
 source = ["."]
-include = []
+include = ["."]
+artifact = "obj"
 
 [options]
 compiler = "g++"
