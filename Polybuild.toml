@@ -1,0 +1,8 @@
+[paths]
+source = ["."]
+include = []
+
+[options]
+compiler = "g++"
+compilation-flags = "-Wall -std=c++17 -O3"
+libraries = ["pthread"]
