@@ -121,34 +121,34 @@ int main() {
                 output << '\t' << generate_echo("Finished building $@ from $<!") << "\n\n";
             }
         }
+    }
 
-        output << output_path << ':';
-        for (const auto& object_path : object_paths) {
-            output << ' ' << object_path.string();
+    output << output_path << ':';
+    for (const auto& object_path : object_paths) {
+        output << ' ' << object_path.string();
+    }
+    output << "\n\t" << generate_echo("Building $@...") << '\n';
+    {
+        auto path = std::filesystem::path(output_path);
+        if (path.has_parent_path()) {
+            output << "\t@mkdir -p " << path.parent_path().string() << '\n';
         }
-        output << "\n\t" << generate_echo("Building $@...") << '\n';
-        {
-            auto path = std::filesystem::path(output_path);
-            if (path.has_parent_path()) {
-                output << "\t@mkdir -p " << path.parent_path().string() << '\n';
-            }
-        }
-        output << "\t@$(compiler) $^ $(compiler_flags) $(libraries) -o $@\n";
-        output << '\t' << generate_echo("Finished building $@!") << "\n\n";
+    }
+    output << "\t@$(compiler) $^ $(compiler_flags) $(libraries) -o $@\n";
+    output << '\t' << generate_echo("Finished building $@!") << "\n\n";
 
-        output << "clean:\n";
-        output << '\t' << generate_echo("Deleting " + output_path + " and " + artifact_path + "...") << '\n';
-        output << "\t@rm -rf " << output_path << ' ' << artifact_path << '\n';
-        output << '\t' << generate_echo("Finished deleting " + output_path + " and " + artifact_path + '!') << '\n';
-        output << ".PHONY: clean\n\n";
+    output << "clean:\n";
+    output << '\t' << generate_echo("Deleting " + output_path + " and " + artifact_path + "...") << '\n';
+    output << "\t@rm -rf " << output_path << ' ' << artifact_path << '\n';
+    output << '\t' << generate_echo("Finished deleting " + output_path + " and " + artifact_path + '!') << '\n';
+    output << ".PHONY: clean\n\n";
 
-        if (!install_path.empty()) {
-            output << "install:\n";
-            output << '\t' << generate_echo("Copying " + output_path + " to " + install_path + "...") << '\n';
-            output << "\t@cp " << output_path << ' ' << install_path << '\n';
-            output << '\t' << generate_echo("Finished copying " + output_path + " to " + install_path + '!') << '\n';
-            output << ".PHONY: install\n";
-        }
+    if (!install_path.empty()) {
+        output << "install:\n";
+        output << '\t' << generate_echo("Copying " + output_path + " to " + install_path + "...") << '\n';
+        output << "\t@cp " << output_path << ' ' << install_path << '\n';
+        output << '\t' << generate_echo("Finished copying " + output_path + " to " + install_path + '!') << '\n';
+        output << ".PHONY: install\n";
     }
 
     std::cout << generate_log("Finished converting Polybuild.toml to Makefile!") << std::endl;
