@@ -40,7 +40,7 @@ void find_dependencies(const std::filesystem::path& path, const std::vector<std:
 }
 
 std::string generate_echo(const std::string& str) {
-    return "@echo -e '\\033[1m[POLYBUILD]\\033[0m " + str + '\'';
+    return "@printf '\\033[1m[POLYBUILD]\\033[0m " + str + "\\n'";
 }
 
 std::string generate_log(const std::string& str) {
