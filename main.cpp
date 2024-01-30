@@ -55,6 +55,7 @@ int main() {
     auto output_path = toml::find<std::string>(paths_table, "output");
     auto source_paths = toml::find<std::vector<std::string>>(paths_table, "source");
     auto include_paths = toml::find_or<std::vector<std::string>>(paths_table, "include", {});
+    auto library_paths = toml::find_or<std::vector<std::string>>(paths_table, "library", {});
     auto artifact_path = toml::find<std::string>(paths_table, "artifact");
     auto install_path = toml::find_or<std::string>(paths_table, "install", {});
 
@@ -80,6 +81,13 @@ int main() {
         output << "compilation_flags +=";
         for (const auto& include_path : include_paths) {
             output << " -I" << include_path;
+        }
+        output << '\n';
+    }
+    if (!library_paths.empty()) {
+        output << "compilation_flags +=";
+        for (const auto& library_path : library_paths) {
+            output << " -L" << library_path;
         }
         output << '\n';
     }
@@ -115,10 +123,10 @@ int main() {
                     output << ' ' << depdendency.string();
                 }
 
-                output << "\n\t" << generate_echo("Building $@ from $<...") << '\n';
+                output << "\n\t" << generate_echo("Compiling $@ from $<...") << '\n';
                 output << "\t@mkdir -p " << artifact_path << '\n';
                 output << "\t@$(compiler) -c $< $(compilation_flags) -o $@\n";
-                output << '\t' << generate_echo("Finished building $@ from $<!") << "\n\n";
+                output << '\t' << generate_echo("Finished compiling $@ from $<!") << "\n\n";
             }
         }
     }

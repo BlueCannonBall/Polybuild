@@ -8,6 +8,7 @@ First, make a `Polybuild.toml` at your project's root:
 output = "polybuild" # Where to put the final result (no default)
 source = ["."] # Where to find .c/.cpp files (no default)
 include = ["include"] # Equivalent to the -I option of a compiler (default: empty)
+library = ["lib"] # Equivalent to the -L option of a compiler (default: your system default C++ compiler library paths)
 artifact = "obj" # Where to put .o files (no default)
 install = "/usr/local/bin" # Where to put the output binary when `make install` is executed (default: empty)
 
