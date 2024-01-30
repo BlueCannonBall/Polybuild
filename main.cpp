@@ -72,12 +72,12 @@ int main() {
         output << "compiler := $(CXX)\n";
     }
     if (!compilation_flags.empty()) {
-        output << "compiler_flags := " << compilation_flags << '\n';
+        output << "compilation_flags := " << compilation_flags << '\n';
     } else {
-        output << "compiler_flags := $(CXXFLAGS)\n";
+        output << "compilation_flags := $(CXXFLAGS)\n";
     }
     if (!include_paths.empty()) {
-        output << "compiler_flags +=";
+        output << "compilation_flags +=";
         for (const auto& include_path : include_paths) {
             output << " -I" << include_path;
         }
@@ -117,7 +117,7 @@ int main() {
 
                 output << "\n\t" << generate_echo("Building $@ from $<...") << '\n';
                 output << "\t@mkdir -p " << artifact_path << '\n';
-                output << "\t@$(compiler) -c $< $(compiler_flags) -o $@\n";
+                output << "\t@$(compiler) -c $< $(compilation_flags) -o $@\n";
                 output << '\t' << generate_echo("Finished building $@ from $<!") << "\n\n";
             }
         }
@@ -134,7 +134,7 @@ int main() {
             output << "\t@mkdir -p " << path.parent_path().string() << '\n';
         }
     }
-    output << "\t@$(compiler) $^ $(compiler_flags) $(libraries) -o $@\n";
+    output << "\t@$(compiler) $^ $(compilation_flags) $(libraries) -o $@\n";
     output << '\t' << generate_echo("Finished building $@!") << "\n\n";
 
     output << "clean:\n";
