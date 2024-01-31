@@ -149,10 +149,10 @@ int main() {
     output << '\t' << generate_echo("Deleting " + output_path + " and " + artifact_path + "...") << '\n';
     output << "\t@rm -rf " << output_path << ' ' << artifact_path << '\n';
     output << '\t' << generate_echo("Finished deleting " + output_path + " and " + artifact_path + '!') << '\n';
-    output << ".PHONY: clean\n\n";
+    output << ".PHONY: clean\n";
 
     if (!install_path.empty()) {
-        output << "install:\n";
+        output << "\ninstall:\n";
         output << '\t' << generate_echo("Copying " + output_path + " to " + install_path + "...") << '\n';
         output << "\t@cp " << output_path << ' ' << install_path << '\n';
         output << '\t' << generate_echo("Finished copying " + output_path + " to " + install_path + '!') << '\n';
