@@ -22,4 +22,6 @@ static = false # Equivalent to the -static option of a compiler (default: false)
 Then, run Polybuild in the root directory. This generates a Makefile in the same directory. This file should only be regenerated (by running Polybuild again) when you add new files to your project or when you add new includes. The generated Makefile is safe to push to GitHub repositories, as it is the same regardless of the environment in which it was generated. It does not divulge any sensitive information.
 
 ## Installation One-Liner
-`git clone https://github.com/BlueCannonBall/Polybuild.git && cd Polybuild && make && sudo make install && cd ..`
+```sh
+git clone https://github.com/BlueCannonBall/Polybuild.git && cd Polybuild && make && sudo make install && cd ..
+```
