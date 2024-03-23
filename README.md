@@ -18,5 +18,13 @@ compilation-flags = "-Wall -std=c++17 -O3" # Options passed to the compiler (def
 libraries = ["ssl"] # Equivalent to the -l option of a compiler (default: empty)
 shared = false # Equivalent to the -shared and -fPIC options of a compiler (default: false)
 static = false # Equivalent to the -static option of a compiler (default: false)
+
+# Environment variables can be used to change Makefile behavior at runtime
+[env.OS.Windows_NT]
+paths.library = ["winlib"]
+options.compiler = "clang++"
+options.compilation-flags = "-Wall -std=c++17 -O2"
+options.libraries = ["ssl", "ws2_32"]
+options.static = true
 ```
 Then, run Polybuild in the root directory. This generates a Makefile in the same directory. This file should only be regenerated (by running Polybuild again) when you add new files to your project or when you add new includes. The generated Makefile is safe to push to GitHub repositories, as it is the same regardless of the environment in which it was generated. It does not divulge any sensitive information.
