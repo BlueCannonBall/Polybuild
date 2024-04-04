@@ -1,4 +1,5 @@
 #include "toml.hpp"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -154,9 +155,17 @@ int main() {
                     entry.path().extension() == ".cc" ||
                     entry.path().extension() == ".cxx" ||
                     entry.path().extension() == ".cc")) {
-                auto object_path = (std::filesystem::path(artifact_path) / (entry.path().filename().string() + '_' + std::to_string(rand() % 999999))).replace_extension(".o");
+                std::filesystem::path object_path;
+                for (int i = 0;; ++i) {
+                    object_path = (std::filesystem::path(artifact_path) / (entry.path().stem().string() + '_' + std::to_string(i))).replace_extension(".o");
+                    if (std::find(object_paths.begin(), object_paths.end(), object_path) != object_paths.end()) {
+                        continue;
+                    } else {
+                        object_paths.push_back(object_path);
+                        break;
+                    }
+                }
                 output << object_path.string() << ": " << entry.path().string();
-                object_paths.push_back(object_path);
 
                 std::vector<std::filesystem::path> dependencies;
                 find_dependencies(entry.path(), include_paths, dependencies);
