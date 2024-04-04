@@ -154,7 +154,7 @@ int main() {
                     entry.path().extension() == ".cc" ||
                     entry.path().extension() == ".cxx" ||
                     entry.path().extension() == ".cc")) {
-                auto object_path = (std::filesystem::path(artifact_path) / entry.path().filename()).replace_extension(".o");
+                auto object_path = (std::filesystem::path(artifact_path) / (entry.path().filename().string() + '_' + std::to_string(rand() % 999999))).replace_extension(".o");
                 output << object_path.string() << ": " << entry.path().string();
                 object_paths.push_back(object_path);
 
