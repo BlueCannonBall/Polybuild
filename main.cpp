@@ -52,7 +52,7 @@ int main() {
     std::cout << generate_log("Converting Polybuild.toml to Makefile...") << std::endl;
     auto config = toml::parse("Polybuild.toml");
 
-    auto& paths_table = toml::find(config, "paths");
+    auto paths_table = toml::find(config, "paths");
     auto output_path = toml::find<std::string>(paths_table, "output");
     auto source_paths = toml::find<std::vector<std::string>>(paths_table, "source");
     auto include_paths = toml::find_or<std::vector<std::string>>(paths_table, "include", {});
@@ -60,7 +60,7 @@ int main() {
     auto artifact_path = toml::find<std::string>(paths_table, "artifact");
     auto install_path = toml::find_or<std::string>(paths_table, "install", {});
 
-    auto& options_table = toml::find(config, "options");
+    auto options_table = toml::find(config, "options");
     auto compiler = toml::find_or<std::string>(options_table, "compiler", "$(CXX)");
     auto compilation_flags = toml::find_or<std::string>(options_table, "compilation-flags", "$(CXXFLAGS)");
     auto libraries = toml::find_or<std::vector<std::string>>(options_table, "libraries", {});
@@ -98,13 +98,13 @@ int main() {
         output << "libraries := $(LDLIBS)\n";
     }
 
-    auto& env_table = toml::find_or<toml::table>(config, "env", {});
+    auto env_table = toml::find_or<toml::table>(config, "env", {});
     for (const auto& env_var_table : env_table) {
         for (const auto& env_var_value_table : env_var_table.second.as_table()) {
-            auto& custom_paths_table = toml::find_or(env_var_value_table.second, "paths", {});
+            auto custom_paths_table = toml::find_or(env_var_value_table.second, "paths", {});
             auto custom_library_paths = toml::find_or<std::vector<std::string>>(custom_paths_table, "library", std::vector<std::string>(library_paths));
 
-            auto& custom_options_table = toml::find_or(env_var_value_table.second, "options", {});
+            auto custom_options_table = toml::find_or(env_var_value_table.second, "options", {});
             auto custom_compilation_flags = toml::find_or<std::string>(custom_options_table, "compilation-flags", compilation_flags);
             auto custom_is_static = toml::find_or<bool>(custom_options_table, "static", is_static);
 
