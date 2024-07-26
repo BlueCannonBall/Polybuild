@@ -7,6 +7,16 @@
 #include <string>
 #include <vector>
 
+std::string path_to_string(const std::filesystem::path& path) {
+#ifdef _WIN32
+    std::string ret = path.string();
+    std::replace(ret.begin(), ret.end(), '\\', '/');
+    return ret;
+#else
+    return path.string();
+#endif
+}
+
 void find_dependencies(const std::filesystem::path& path, const std::vector<std::string>& include_paths, std::vector<std::filesystem::path>& ret) {
     const static std::regex angled_include_regex("^\\s*#\\s*include\\s*<(.+)>.*$", std::regex::optimize);
     const static std::regex quoted_include_regex("^\\s*#\\s*include\\s*\"(.+)\".*$", std::regex::optimize);
@@ -17,7 +27,7 @@ void find_dependencies(const std::filesystem::path& path, const std::vector<std:
         if (std::regex_match(line, matches, angled_include_regex) ||
             std::regex_match(line, matches, quoted_include_regex)) {
             // First, check locally
-            auto header_path = path.parent_path() / std::filesystem::path(matches[1]);
+            auto header_path = path.parent_path() / std::filesystem::path(std::string(matches[1]));
             if (std::filesystem::is_regular_file(header_path)) {
                 if (std::find(ret.begin(), ret.end(), header_path) == ret.end()) {
                     ret.push_back(header_path);
@@ -28,7 +38,7 @@ void find_dependencies(const std::filesystem::path& path, const std::vector<std:
 
             // Then, check the include path
             for (std::filesystem::path include_path : include_paths) {
-                auto header_path = include_path / std::filesystem::path(matches[1]);
+                auto header_path = include_path / std::filesystem::path(std::string(matches[1]));
                 if (std::filesystem::is_regular_file(header_path)) {
                     if (std::find(ret.begin(), ret.end(), header_path) == ret.end()) {
                         ret.push_back(header_path);
@@ -157,7 +167,7 @@ int main() {
                     entry.path().extension() == ".cc")) {
                 std::filesystem::path object_path;
                 for (int i = 0;; ++i) {
-                    object_path = (std::filesystem::path(artifact_path) / (entry.path().stem().string() + '_' + std::to_string(i))).replace_extension(".o");
+                    object_path = (std::filesystem::path(artifact_path) / (path_to_string(entry.path().stem()) + '_' + std::to_string(i))).replace_extension(".o");
                     if (std::find(object_paths.begin(), object_paths.end(), object_path) != object_paths.end()) {
                         continue;
                     } else {
@@ -165,12 +175,12 @@ int main() {
                         break;
                     }
                 }
-                output << object_path.string() << ": " << entry.path().string();
+                output << path_to_string(object_path) << ": " << path_to_string(entry.path());
 
                 std::vector<std::filesystem::path> dependencies;
                 find_dependencies(entry.path(), include_paths, dependencies);
                 for (const auto& depdendency : dependencies) {
-                    output << ' ' << depdendency.string();
+                    output << ' ' << path_to_string(depdendency);
                 }
 
                 output << "\n\t" << generate_echo("Compiling $@ from $<...") << '\n';
@@ -183,13 +193,13 @@ int main() {
 
     output << output_path << ':';
     for (const auto& object_path : object_paths) {
-        output << ' ' << object_path.string();
+        output << ' ' << path_to_string(object_path);
     }
     output << "\n\t" << generate_echo("Building $@...") << '\n';
     {
         auto path = std::filesystem::path(output_path);
         if (path.has_parent_path()) {
-            output << "\t@mkdir -p " << path.parent_path().string() << '\n';
+            output << "\t@mkdir -p " << path_to_string(path.parent_path()) << '\n';
         }
     }
     output << "\t@$(compiler) $^ $(compilation_flags) $(libraries) -o $@\n\t" << generate_echo("Finished building $@!") << "\n\n";
