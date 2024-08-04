@@ -16,6 +16,8 @@ install = "/usr/local/bin" # Where to put the output binary when `make install` 
 compiler = "g++" # The compiler to use (default: your system default C++ compiler)
 compilation-flags = "-Wall -std=c++17 -O3" # Options passed to the compiler (default: your system default C++ compiler flags)
 libraries = ["ssl"] # Equivalent to the -l option of a compiler (default: empty)
+preludes = ["echo this is an arbitrary command that always runs"] # (default: empty)
+clean-preludes = ["echo this is an arbitrary command that runs with the clean target"] # (default: empty)
 shared = false # Equivalent to the -shared and -fPIC options of a compiler (default: false)
 static = false # Equivalent to the -static option of a compiler (default: false)
 

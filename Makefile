@@ -15,7 +15,7 @@ obj/main_0.o: ./main.cpp ./toml.hpp ./toml/parser.hpp ./toml/combinator.hpp ./to
 
 polybuild: obj/main_0.o
 	@printf '\033[1m[POLYBUILD]\033[0m Building $@...\n'
-	@$(compiler) $^ $(compilation_flags) $(libraries) -o $@
+	@$(compiler) $^ $(compilation_flags) $(libraries) $(static_libraries) -o $@
 	@printf '\033[1m[POLYBUILD]\033[0m Finished building $@!\n'
 
 clean:

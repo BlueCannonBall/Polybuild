@@ -74,6 +74,9 @@ int main() {
     auto compiler = toml::find_or<std::string>(options_table, "compiler", "$(CXX)");
     auto compilation_flags = toml::find_or<std::string>(options_table, "compilation-flags", "$(CXXFLAGS)");
     auto libraries = toml::find_or<std::vector<std::string>>(options_table, "libraries", {});
+    auto static_libraries = toml::find_or<std::vector<std::string>>(options_table, "static-libraries", {});
+    auto preludes = toml::find_or<std::vector<std::string>>(options_table, "preludes", {});
+    auto clean_preludes = toml::find_or<std::vector<std::string>>(options_table, "clean-preludes", {});
     auto is_shared = toml::find_or<bool>(options_table, "shared", false);
     auto is_static = toml::find_or<bool>(options_table, "static", false);
 
@@ -106,6 +109,14 @@ int main() {
         output << '\n';
     } else {
         output << "libraries := $(LDLIBS)\n";
+    }
+
+    if (!static_libraries.empty()) {
+        output << "static_libraries :=";
+        for (const auto& static_library : static_libraries) {
+            output << ' ' << static_library;
+        }
+        output << '\n';
     }
 
     auto env_table = toml::find_or<toml::table>(config, "env", {});
@@ -149,11 +160,20 @@ int main() {
                 output << '\n';
             }
 
+            if (custom_options_table.contains("static-libraries")) {
+                auto custom_static_libraries = toml::find<std::vector<std::string>>(custom_options_table, "static-libraries");
+                output << "\tstatic_libraries :=";
+                for (const auto& static_library : custom_static_libraries) {
+                    output << ' ' << static_library;
+                }
+                output << '\n';
+            }
+
             output << "endif\n";
         }
     }
 
-    output << "\ndefault: " << output_path << "\n.PHONY: default\n\n";
+    output << "\ndefault: " << output_path << "\n.PHONY: default\n";
 
     std::vector<std::filesystem::path> object_paths;
     for (std::filesystem::path source_path : source_paths) {
@@ -175,7 +195,8 @@ int main() {
                         break;
                     }
                 }
-                output << path_to_string(object_path) << ": " << path_to_string(entry.path());
+                output << '\n'
+                       << path_to_string(object_path) << ": " << path_to_string(entry.path());
 
                 std::vector<std::filesystem::path> dependencies;
                 find_dependencies(entry.path(), include_paths, dependencies);
@@ -186,26 +207,35 @@ int main() {
                 output << "\n\t" << generate_echo("Compiling $@ from $<...") << '\n';
                 output << "\t@mkdir -p " << artifact_path << '\n';
                 output << "\t@$(compiler) -c $< $(compilation_flags) -o $@\n";
-                output << '\t' << generate_echo("Finished compiling $@ from $<!") << "\n\n";
+                output << '\t' << generate_echo("Finished compiling $@ from $<!") << '\n';
             }
         }
     }
 
-    output << output_path << ':';
+    output << '\n'
+           << output_path << ':';
     for (const auto& object_path : object_paths) {
         output << ' ' << path_to_string(object_path);
     }
-    output << "\n\t" << generate_echo("Building $@...") << '\n';
+    output << "\n\t" << generate_echo("Building $@...");
     {
         auto path = std::filesystem::path(output_path);
         if (path.has_parent_path()) {
-            output << "\t@mkdir -p " << path_to_string(path.parent_path()) << '\n';
+            output << "\n\t@mkdir -p " << path_to_string(path.parent_path());
         }
     }
-    output << "\t@$(compiler) $^ $(compilation_flags) $(libraries) -o $@\n\t" << generate_echo("Finished building $@!") << "\n\n";
+    for (const auto& prelude : preludes) {
+        output << "\n\t" << generate_echo("Executing prelude: " + prelude);
+        output << "\n\t@" << prelude;
+    }
+    output << "\n\t@$(compiler) $^ $(compilation_flags) $(libraries) $(static_libraries) -o $@\n\t" << generate_echo("Finished building $@!") << '\n';
 
-    output << "clean:\n";
-    output << '\t' << generate_echo("Deleting " + output_path + " and " + artifact_path + "...") << '\n';
+    output << "\nclean:";
+    for (const auto& clean_prelude : clean_preludes) {
+        output << "\n\t" << generate_echo("Executing clean prelude: " + clean_prelude);
+        output << "\n\t@" << clean_prelude;
+    }
+    output << "\n\t" << generate_echo("Deleting " + output_path + " and " + artifact_path + "...") << '\n';
     output << "\t@rm -rf " << output_path << ' ' << artifact_path << '\n';
     output << '\t' << generate_echo("Finished deleting " + output_path + " and " + artifact_path + '!') << '\n';
     output << ".PHONY: clean\n";
