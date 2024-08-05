@@ -228,7 +228,7 @@ int main() {
         output << "\n\t" << generate_echo("Executing prelude: " + prelude);
         output << "\n\t@" << prelude;
     }
-    output << "\n\t@$(compiler) $^ $(compilation_flags) $(libraries) $(static_libraries) -o $@\n\t" << generate_echo("Finished building $@!") << '\n';
+    output << "\n\t@$(compiler) $^ $(static_libraries) $(compilation_flags) $(libraries) -o $@\n\t" << generate_echo("Finished building $@!") << '\n';
 
     output << "\nclean:";
     for (const auto& clean_prelude : clean_preludes) {
