@@ -16,6 +16,7 @@ install = "/usr/local/bin" # Where to put the output binary when `make install` 
 compiler = "g++" # The compiler to use (default: your system default C++ compiler)
 compilation-flags = "-Wall -std=c++17 -O3" # Options passed to the compiler (default: your system default C++ compiler flags)
 libraries = ["ssl"] # Equivalent to the -l option of a compiler (default: empty)
+pkg-config-libraries = ["gstreamer-1.0"] # A list of libraries added to `compilation-flags` and `libraries` with `pkg-config`
 preludes = ["echo this is an arbitrary command that always runs"] # (default: empty)
 clean-preludes = ["echo this is an arbitrary command that runs with the clean target"] # (default: empty)
 shared = false # Equivalent to the -shared and -fPIC options of a compiler (default: false)
@@ -27,6 +28,7 @@ paths.library = ["winlib"]
 options.compiler = "clang++"
 options.compilation-flags = "-Wall -std=c++17 -O2"
 options.libraries = ["ssl", "ws2_32"]
+options.pkg-config-libraries = ["gstreamer-1.0", "glew"]
 options.static = true
 ```
 Then, run Polybuild in the root directory. This generates a Makefile in the same directory. This file should only be regenerated (by running Polybuild again) when you add new files to your project or when you add new includes. The generated Makefile is safe to push to GitHub repositories, as it is the same regardless of the environment in which it was generated. It does not divulge any sensitive information.
