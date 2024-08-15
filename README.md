@@ -35,5 +35,5 @@ Then, run Polybuild in the root directory. This generates a Makefile in the same
 
 ## Installation One-Liner
 ```sh
-git clone https://github.com/BlueCannonBall/Polybuild.git && cd Polybuild && make && sudo make install && cd ..
+git clone https://github.com/BlueCannonBall/Polybuild.git && cd Polybuild && make && sudo make install
 ```
