@@ -7,16 +7,6 @@
 #include <string>
 #include <vector>
 
-std::string path_to_string(const std::filesystem::path& path) {
-#ifdef _WIN32
-    std::string ret = path.string();
-    std::replace(ret.begin(), ret.end(), '\\', '/');
-    return ret;
-#else
-    return path.string();
-#endif
-}
-
 void find_dependencies(const std::filesystem::path& path, const std::vector<std::string>& include_paths, std::vector<std::filesystem::path>& ret) {
     const static std::regex angled_include_regex("^\\s*#\\s*include\\s*<(.+)>.*$", std::regex::optimize);
     const static std::regex quoted_include_regex("^\\s*#\\s*include\\s*\"(.+)\".*$", std::regex::optimize);
@@ -237,12 +227,12 @@ int main() {
                     }
                 }
                 output << '\n'
-                       << path_to_string(object_path) << "$(obj_ext): " << path_to_string(entry.path());
+                       << object_path.generic_string() << "$(obj_ext): " << entry.path().generic_string();
 
                 std::vector<std::filesystem::path> dependencies;
                 find_dependencies(entry.path(), include_paths, dependencies);
                 for (const auto& depdendency : dependencies) {
-                    output << ' ' << path_to_string(depdendency);
+                    output << ' ' << depdendency.generic_string();
                 }
 
                 output << "\n\t" << generate_echo("Compiling $@ from $<...") << '\n';
@@ -256,13 +246,13 @@ int main() {
     output << '\n'
            << output_path << "$(out_ext):";
     for (const auto& object_path : object_paths) {
-        output << ' ' << path_to_string(object_path) << "$(obj_ext)";
+        output << ' ' << object_path.generic_string() << "$(obj_ext)";
     }
     output << "\n\t" << generate_echo("Building $@...");
     {
         auto path = std::filesystem::path(output_path);
         if (path.has_parent_path()) {
-            output << "\n\t@mkdir -p " << path_to_string(path.parent_path());
+            output << "\n\t@mkdir -p " << path.parent_path().generic_string();
         }
     }
     for (const auto& prelude : preludes) {
