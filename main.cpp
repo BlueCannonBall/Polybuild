@@ -40,16 +40,16 @@ void find_dependencies(const std::filesystem::path& path, const std::vector<std:
     }
 }
 
-std::string generate_echo(const std::string& str) {
+std::string echo(const std::string& str) {
     return "@printf '\\033[1m[POLYBUILD]\\033[0m " + str + "\\n'";
 }
 
-std::string generate_log(const std::string& str) {
+std::string log(const std::string& str) {
     return "\033[1m[POLYBUILD]\033[0m " + str;
 }
 
 int main() {
-    std::cout << generate_log("Converting Polybuild.toml to Makefile...") << std::endl;
+    std::cout << log("Converting Polybuild.toml to Makefile...") << std::endl;
     auto config = toml::parse("Polybuild.toml");
 
     auto paths_table = toml::find(config, "paths");
@@ -63,6 +63,7 @@ int main() {
     auto options_table = toml::find(config, "options");
     auto compiler = toml::find_or<std::string>(options_table, "compiler", "$(CXX)");
     auto compilation_flags = toml::find_or<std::string>(options_table, "compilation-flags", "$(CXXFLAGS)");
+    auto link_time_flags = toml::find_or<std::string>(options_table, "link-time-flags", "$(LDFLAGS)");
     auto libraries = toml::find_or<std::vector<std::string>>(options_table, "libraries", {});
     auto static_libraries = toml::find_or<std::vector<std::string>>(options_table, "static-libraries", {});
     auto pkg_config_libraries = toml::find_or<std::vector<std::string>>(options_table, "pkg-config-libraries", {});
@@ -116,6 +117,8 @@ int main() {
     }
     output << '\n';
 
+    output << "link_time_flags := " << link_time_flags << '\n';
+
     output << "libraries :=";
     for (const auto& library : libraries) {
         output << " -l" << library;
@@ -145,6 +148,7 @@ int main() {
 
             auto custom_options_table = toml::find_or(env_var_value_table.second, "options", {});
             auto custom_compilation_flags = toml::find_or<std::string>(custom_options_table, "compilation-flags", compilation_flags);
+            auto custom_link_time_flags = toml::find_or<std::string>(custom_options_table, "link-time-flags", link_time_flags);
             auto custom_libraries = toml::find_or<std::vector<std::string>>(custom_options_table, "libraries", std::vector<std::string>(libraries));
             auto custom_pkg_config_libraries = toml::find_or<std::vector<std::string>>(options_table, "pkg-config-libraries", std::vector<std::string>(pkg_config_libraries));
             auto custom_is_static = toml::find_or<bool>(custom_options_table, "static", is_static);
@@ -177,6 +181,8 @@ int main() {
                 output << '`';
             }
             output << '\n';
+
+            output << "link_time_flags := " << custom_link_time_flags << '\n';
 
             output << "\tlibraries :=";
             for (const auto& library : custom_libraries) {
@@ -217,7 +223,7 @@ int main() {
                     entry.path().extension() == ".cxx" ||
                     entry.path().extension() == ".cc")) {
                 std::filesystem::path object_path;
-                for (int i = 0;; ++i) {
+                for (unsigned int i = 0;; ++i) {
                     object_path = (std::filesystem::path(artifact_path) / (entry.path().stem().string() + '_' + std::to_string(i)));
                     if (std::find(object_paths.begin(), object_paths.end(), object_path) != object_paths.end()) {
                         continue;
@@ -229,56 +235,67 @@ int main() {
                 output << '\n'
                        << object_path.generic_string() << "$(obj_ext): " << entry.path().generic_string();
 
+                if (!preludes.empty()) {
+                    output << " preludes";
+                }
                 std::vector<std::filesystem::path> dependencies;
                 find_dependencies(entry.path(), include_paths, dependencies);
                 for (const auto& depdendency : dependencies) {
                     output << ' ' << depdendency.generic_string();
                 }
 
-                output << "\n\t" << generate_echo("Compiling $@ from $<...") << '\n';
+                output << "\n\t" << echo("Compiling $@ from $<...") << '\n';
                 output << "\t@mkdir -p " << artifact_path << '\n';
                 output << "\t@$(compiler) -c $< $(compilation_flags) -o $@\n";
-                output << '\t' << generate_echo("Finished compiling $@ from $<!") << '\n';
+                output << '\t' << echo("Finished compiling $@ from $<!") << '\n';
             }
         }
     }
 
     output << '\n'
            << output_path << "$(out_ext):";
+    if (!preludes.empty()) {
+        output << " preludes";
+    }
     for (const auto& object_path : object_paths) {
         output << ' ' << object_path.generic_string() << "$(obj_ext)";
     }
-    output << "\n\t" << generate_echo("Building $@...");
+    output << "\n\t" << echo("Building $@...");
     {
         auto path = std::filesystem::path(output_path);
         if (path.has_parent_path()) {
             output << "\n\t@mkdir -p " << path.parent_path().generic_string();
         }
     }
-    for (const auto& prelude : preludes) {
-        output << "\n\t" << generate_echo("Executing prelude: " + prelude);
-        output << "\n\t@" << prelude;
+    output << "\n\t@$(compiler) $(filter-out preludes, $^) $(static_libraries) $(compilation_flags) $(link_time_flags) $(libraries) -o $@\n\t" << echo("Finished building $@!") << '\n';
+
+    if (!preludes.empty()) {
+        output << "\npreludes:";
+        for (const auto& prelude : preludes) {
+            output << "\n\t" << echo("Executing prelude: " + prelude);
+            output << "\n\t@" << prelude;
+        }
+        output << "\n.PHONY: preludes\n";
     }
-    output << "\n\t@$(compiler) $^ $(static_libraries) $(compilation_flags) $(libraries) -o $@\n\t" << generate_echo("Finished building $@!") << '\n';
 
     output << "\nclean:";
     for (const auto& clean_prelude : clean_preludes) {
-        output << "\n\t" << generate_echo("Executing clean prelude: " + clean_prelude);
+        output << "\n\t" << echo("Executing clean prelude: " + clean_prelude);
         output << "\n\t@" << clean_prelude;
     }
-    output << "\n\t" << generate_echo("Deleting " + output_path + "$(out_ext) and " + artifact_path + "...") << '\n';
+    output << "\n\t" << echo("Deleting " + output_path + "$(out_ext) and " + artifact_path + "...") << '\n';
     output << "\t@rm -rf " << output_path << "$(out_ext) " << artifact_path << '\n';
-    output << '\t' << generate_echo("Finished deleting " + output_path + "$(out_ext) and " + artifact_path + '!') << '\n';
+    output << '\t' << echo("Finished deleting " + output_path + "$(out_ext) and " + artifact_path + '!') << '\n';
     output << ".PHONY: clean\n";
 
     if (!install_path.empty()) {
         output << "\ninstall:\n";
-        output << '\t' << generate_echo("Copying " + output_path + "$(out_ext) to " + install_path + "...") << '\n';
+        output << '\t' << echo("Copying " + output_path + "$(out_ext) to " + install_path + "...") << '\n';
         output << "\t@cp " << output_path << "$(out_ext) " << install_path << '\n';
-        output << '\t' << generate_echo("Finished copying " + output_path + " to " + install_path + '!') << '\n';
+        output << '\t' << echo("Finished copying " + output_path + " to " + install_path + '!') << '\n';
         output << ".PHONY: install\n";
     }
 
-    std::cout << generate_log("Finished converting Polybuild.toml to Makefile!") << std::endl;
+    std::cout << log("Finished converting Polybuild.toml to Makefile!") << std::endl;
     return 0;
 }

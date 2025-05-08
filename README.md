@@ -15,6 +15,7 @@ install = "/usr/local/bin" # Where to put the output binary when `make install` 
 [options]
 compiler = "g++" # The compiler to use (default: your system default C++ compiler)
 compilation-flags = "-Wall -std=c++17 -O3" # Options passed to the compiler (default: your system default C++ compiler flags)
+link-time-flags = "-lX11" # Options passed to the compiler only at link time
 libraries = ["ssl"] # Equivalent to the -l option of a compiler (default: empty)
 pkg-config-libraries = ["gstreamer-1.0"] # A list of libraries added to `compilation-flags` and `libraries` with `pkg-config`
 preludes = ["echo this is an arbitrary command that always runs"] # (default: empty)
@@ -27,6 +28,7 @@ static = false # Equivalent to the -static option of a compiler (default: false)
 paths.library = ["winlib"]
 options.compiler = "clang++"
 options.compilation-flags = "-Wall -std=c++17 -O2"
+options.link-time-flags = "-lws2_32"
 options.libraries = ["ssl", "ws2_32"]
 options.pkg-config-libraries = ["gstreamer-1.0", "glew"]
 options.static = true
