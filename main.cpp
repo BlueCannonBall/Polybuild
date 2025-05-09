@@ -2,8 +2,10 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <vector>
 #ifndef _WIN32
@@ -44,11 +46,11 @@ void find_dependencies(const std::filesystem::path& path, const std::vector<std:
 }
 
 std::string echo(const std::string& str, bool silent = true) {
-    if (silent) {
-        return "@printf '\\033[1m[POLYBUILD]\\033[0m " + str + "\\n'";
-    } else {
-        return "printf '\\033[1m[POLYBUILD]\\033[0m " + str + "\\n'";
-    }
+    std::ostringstream ss;
+    if (silent) ss << '@';
+    ss << "printf \"\\033[1m[POLYBUILD]\\033[0m %s\\n\""
+       << ' ' << std::quoted(str);
+    return ss.str();
 }
 
 std::string log(const std::string& str) {
@@ -300,8 +302,7 @@ int main() {
         for (const auto& prelude : preludes) {
             script << "\n\t"
                    << echo("Executing prelude: " + prelude, false);
-            script << "\n\t"
-                   << prelude;
+            script << "\n\t sh -c " << std::quoted(prelude);
         }
         script << "\nfi\n";
     }
