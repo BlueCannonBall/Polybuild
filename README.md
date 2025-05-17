@@ -18,7 +18,7 @@ compilation-flags = "-Wall -std=c++17 -O3" # Options passed to the compiler (def
 link-time-flags = "-lX11" # Options passed to the compiler only at link time
 libraries = ["ssl"] # Equivalent to the -l option of a compiler (default: empty)
 pkg-config-libraries = ["gstreamer-1.0"] # A list of libraries added to `compilation-flags` and `libraries` with `pkg-config`
-preludes = ["echo this is an arbitrary command that always runs"] # (default: empty)
+preludes = ["echo this is an arbitrary command that always runs", "echo these commands may execute in parallel"] # (default: empty)
 clean-preludes = ["echo this is an arbitrary command that runs with the clean target"] # (default: empty)
 shared = false # Equivalent to the -shared and -fPIC options of a compiler (default: false)
 static = false # Equivalent to the -static option of a compiler (default: false)
