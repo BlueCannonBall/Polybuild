@@ -301,12 +301,12 @@ int main() {
             wrapper << "\n\t@" << prelude;
         }
     }
-    wrapper << "\n\t@$(MAKE) -f .polybuild.mk\n.PHONY: all\n";
+    wrapper << "\n\t@$(MAKE) -f .polybuild.mk --no-print-directory\n.PHONY: all\n";
 
-    wrapper << "\nclean:\n\t@$(MAKE) -f .polybuild.mk $@\n.PHONY: clean\n";
+    wrapper << "\nclean:\n\t@$(MAKE) -f .polybuild.mk --no-print-directory $@\n.PHONY: clean\n";
 
     if (!install_path.empty()) {
-        wrapper << "\ninstall:\n\t@$(MAKE) -f .polybuild.mk $@\n.PHONY: install\n";
+        wrapper << "\ninstall:\n\t@$(MAKE) -f .polybuild.mk --no-print-directory $@\n.PHONY: install\n";
     }
 
     wrapper.close();
