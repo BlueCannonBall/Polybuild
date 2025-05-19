@@ -187,7 +187,7 @@ int main() {
             }
             makefile << '\n';
 
-            makefile << "link_time_flags := " << custom_link_time_flags << '\n';
+            makefile << "\tlink_time_flags := " << custom_link_time_flags << '\n';
 
             makefile << "\tlibraries :=";
             for (const auto& library : custom_libraries) {
