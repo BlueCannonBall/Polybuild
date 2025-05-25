@@ -44,8 +44,7 @@ void find_dependencies(const std::filesystem::path& path, const std::vector<std:
 
 std::string echo(const std::string& str) {
     std::ostringstream ss;
-    ss << "@printf \"\\033[1m[POLYBUILD]\\033[0m %s\\n\""
-       << ' ' << std::quoted(str);
+    ss << "@printf \"\\033[1m[POLYBUILD]\\033[0m %s\\n\"" << ' ' << std::quoted(str);
     return ss.str();
 }
 
@@ -215,7 +214,8 @@ int main() {
         }
     }
 
-    makefile << "\nall: " << output_path << "$(out_ext)\n.PHONY: default\n";
+    makefile << "\nall: " << output_path << "$(out_ext)\n";
+    makefile << ".PHONY: all\n";
 
     std::vector<std::filesystem::path> object_paths;
     for (std::filesystem::path source_path : source_paths) {
@@ -259,6 +259,7 @@ int main() {
     for (const auto& object_path : object_paths) {
         makefile << ' ' << object_path.generic_string() << "$(obj_ext)";
     }
+    makefile << " $(static_libraries)";
     makefile << "\n\t" << echo("Building $@...");
     {
         auto path = std::filesystem::path(output_path);
@@ -266,7 +267,7 @@ int main() {
             makefile << "\n\t@mkdir -p " << path.parent_path().generic_string();
         }
     }
-    makefile << "\n\t@$(compiler) $^ $(static_libraries) $(compilation_flags) $(link_time_flags) $(libraries) -o $@\n\t" << echo("Finished building $@!") << '\n';
+    makefile << "\n\t@$(compiler) $^ $(compilation_flags) $(link_time_flags) $(libraries) -o $@\n\t" << echo("Finished building $@!") << '\n';
 
     makefile << "\nclean:";
     for (const auto& clean_prelude : clean_preludes) {
@@ -297,20 +298,24 @@ int main() {
     for (unsigned int i = 0; i < preludes.size(); ++i) {
         wrapper << " prelude" << i;
     }
-    wrapper << "\n\t@$(MAKE) -f .polybuild.mk --no-print-directory\n.PHONY: all\n";
+    wrapper << "\n\t@$(MAKE) -f .polybuild.mk --no-print-directory\n";
+    wrapper << ".PHONY: all\n";
 
     for (unsigned int i = 0; i < preludes.size(); ++i) {
-        wrapper << "\nprelude" << i << ':';
-        wrapper << "\n\t"
-                << echo("Executing prelude: " + preludes[i]);
-        wrapper << "\n\t@" << preludes[i];
-        wrapper << "\n.PHONY: prelude" << i << '\n';
+        wrapper << "\nprelude" << i << ":\n";
+        wrapper << '\t' << echo("Executing prelude: " + preludes[i]) << '\n';
+        wrapper << "\t@" << preludes[i] << '\n';
+        wrapper << ".PHONY: prelude" << i << '\n';
     }
 
-    wrapper << "\nclean:\n\t@$(MAKE) -f .polybuild.mk --no-print-directory $@\n.PHONY: clean\n";
+    wrapper << "\nclean:\n";
+    wrapper << "\t@$(MAKE) -f .polybuild.mk --no-print-directory $@\n";
+    wrapper << ".PHONY: clean\n";
 
     if (!install_path.empty()) {
-        wrapper << "\ninstall:\n\t@$(MAKE) -f .polybuild.mk --no-print-directory $@\n.PHONY: install\n";
+        wrapper << "\ninstall:\n";
+        wrapper << "\t@$(MAKE) -f .polybuild.mk --no-print-directory $@\n";
+        wrapper << ".PHONY: install\n";
     }
 
     wrapper.close();

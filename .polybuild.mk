@@ -16,7 +16,7 @@ link_time_flags := $(LDFLAGS)
 libraries :=
 
 all: polybuild$(out_ext)
-.PHONY: default
+.PHONY: all
 
 obj/main_0$(obj_ext): ./main.cpp ./toml.hpp ./toml/parser.hpp ./toml/combinator.hpp ./toml/region.hpp ./toml/color.hpp ./toml/result.hpp ./toml/traits.hpp ./toml/from.hpp ./toml/into.hpp ./toml/version.hpp ./toml/utility.hpp ./toml/lexer.hpp ./toml/macros.hpp ./toml/types.hpp ./toml/comments.hpp ./toml/datetime.hpp ./toml/string.hpp ./toml/value.hpp ./toml/exception.hpp ./toml/source_location.hpp ./toml/storage.hpp ./toml/literal.hpp ./toml/serializer.hpp ./toml/get.hpp
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Compiling $@ from $<..."
@@ -24,9 +24,9 @@ obj/main_0$(obj_ext): ./main.cpp ./toml.hpp ./toml/parser.hpp ./toml/combinator.
 	@$(compiler) -c $< $(compilation_flags) -o $@
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished compiling $@ from $<!"
 
-polybuild$(out_ext): obj/main_0$(obj_ext)
+polybuild$(out_ext): obj/main_0$(obj_ext) $(static_libraries)
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Building $@..."
-	@$(compiler) $^ $(static_libraries) $(compilation_flags) $(link_time_flags) $(libraries) -o $@
+	@$(compiler) $^ $(compilation_flags) $(link_time_flags) $(libraries) -o $@
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished building $@!"
 
 clean:

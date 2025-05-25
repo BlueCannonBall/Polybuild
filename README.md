@@ -1,5 +1,5 @@
 # Polybuild
-A simple Makefile generator designed for humans.
+A simple and declarative Makefile generator designed for humans.
 
 ## Usage
 First, make a `Polybuild.toml` at your project's root:
