@@ -166,7 +166,7 @@ int main() {
             auto custom_compilation_flags = toml::find_or<std::string>(custom_options_table, "compilation-flags", compilation_flags);
             auto custom_link_time_flags = toml::find_or<std::string>(custom_options_table, "link-time-flags", link_time_flags);
             auto custom_libraries = toml::find_or<std::vector<std::string>>(custom_options_table, "libraries", std::vector<std::string>(libraries));
-            auto custom_pkg_config_libraries = toml::find_or<std::vector<std::string>>(options_table, "pkg-config-libraries", std::vector<std::string>(pkg_config_libraries));
+            auto custom_pkg_config_libraries = toml::find_or<std::vector<std::string>>(custom_options_table, "pkg-config-libraries", std::vector<std::string>(pkg_config_libraries));
             auto custom_is_static = toml::find_or<bool>(custom_options_table, "static", is_static);
 
             makefile << "\nifeq ($(" << env_var_table.first << ")," << env_var_value_table.first << ")\n";
