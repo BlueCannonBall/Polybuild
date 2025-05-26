@@ -84,8 +84,9 @@ int main() {
     makefile << "endif\n\n";
 
     makefile << "library_path_flag := -L\n";
-    makefile << "output_path_flag := -o\n";
-    makefile << "link_flag := -l\n";
+    makefile << "out_path_flag := -o\n";
+    makefile << "obj_path_flag := -o\n";
+    makefile << "library_flag := -l\n";
     makefile << "static_flag := -static\n";
     makefile << "shared_flag := -fPIC -shared\n";
     makefile << "obj_ext := .o\n";
@@ -94,8 +95,9 @@ int main() {
     }
     makefile << "ifeq ($(OS),Windows_NT)\n";
     makefile << "\tlibrary_path_flag := /LIBPATH:\n";
-    makefile << "\toutput_path_flag := /Fe:\n";
-    makefile << "\tlink_flag :=\n";
+    makefile << "\tout_path_flag := /Fe:\n";
+    makefile << "\tobj_path_flag := /Fo:\n";
+    makefile << "\tlibrary_flag :=\n";
     makefile << "\tstatic_flag := /MT\n";
     makefile << "\tshared_flag := /LD\n";
     makefile << "\tobj_ext := .obj\n";
@@ -134,7 +136,7 @@ int main() {
 
     makefile << "libraries :=";
     for (const auto& library : libraries) {
-        makefile << " $(link_flag)" << library;
+        makefile << " $(library_flag)" << library;
     }
     if (!pkg_config_libraries.empty()) {
         makefile << " `pkg-config --libs";
@@ -198,7 +200,7 @@ int main() {
 
             makefile << "\tlibraries :=";
             for (const auto& library : custom_libraries) {
-                makefile << " $(link_flag)" << library;
+                makefile << " $(library_flag)" << library;
             }
             if (!custom_pkg_config_libraries.empty()) {
                 makefile << " `pkg-config --libs";
@@ -256,7 +258,7 @@ int main() {
 
                 makefile << "\n\t" << echo("Compiling $@ from $<...") << '\n';
                 makefile << "\t@mkdir -p " << artifact_path << '\n';
-                makefile << "\t@\"$(compiler)\" -c $< $(compilation_flags) $(output_path_flag)$@\n";
+                makefile << "\t@\"$(compiler)\" -c $< $(compilation_flags) $(obj_path_flag)$@\n";
                 makefile << '\t' << echo("Finished compiling $@ from $<!") << '\n';
             }
         }
@@ -275,7 +277,7 @@ int main() {
             makefile << "\n\t@mkdir -p " << path.parent_path().generic_string();
         }
     }
-    makefile << "\n\t@\"$(compiler)\" $^ $(compilation_flags) $(link_time_flags) $(libraries) $(output_path_flag)$@\n\t" << echo("Finished building $@!") << '\n';
+    makefile << "\n\t@\"$(compiler)\" $^ $(compilation_flags) $(link_time_flags) $(libraries) $(out_path_flag)$@\n\t" << echo("Finished building $@!") << '\n';
 
     makefile << "\nclean:";
     for (const auto& clean_prelude : clean_preludes) {
