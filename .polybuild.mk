@@ -4,8 +4,19 @@ ifndef OS
 	OS := $(shell uname)
 endif
 
+include_path_flag := -I
+library_path_flag := -L
+output_path_flag := -o
+link_flag := -l
+static_flag := -static
+shared_flag := -fPIC -shared
 obj_ext := .o
 ifeq ($(OS),Windows_NT)
+	library_path_flag := /LIBPATH:
+	output_path_flag := /Fe:
+	link_flag :=
+	static_flag := /MT
+	shared_flag := /LD
 	obj_ext := .obj
 	out_ext := .exe
 endif
@@ -21,12 +32,12 @@ all: polybuild$(out_ext)
 obj/main_0$(obj_ext): ./main.cpp ./toml.hpp ./toml/parser.hpp ./toml/combinator.hpp ./toml/region.hpp ./toml/color.hpp ./toml/result.hpp ./toml/traits.hpp ./toml/from.hpp ./toml/into.hpp ./toml/version.hpp ./toml/utility.hpp ./toml/lexer.hpp ./toml/macros.hpp ./toml/types.hpp ./toml/comments.hpp ./toml/datetime.hpp ./toml/string.hpp ./toml/value.hpp ./toml/exception.hpp ./toml/source_location.hpp ./toml/storage.hpp ./toml/literal.hpp ./toml/serializer.hpp ./toml/get.hpp
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Compiling $@ from $<..."
 	@mkdir -p obj
-	@"$(compiler)" -c $< $(compilation_flags) -o $@
+	@"$(compiler)" -c $< $(compilation_flags) $(output_path_flag)$@
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished compiling $@ from $<!"
 
 polybuild$(out_ext): obj/main_0$(obj_ext) $(static_libraries)
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Building $@..."
-	@"$(compiler)" $^ $(compilation_flags) $(link_time_flags) $(libraries) -o $@
+	@"$(compiler)" $^ $(compilation_flags) $(link_time_flags) $(libraries) $(output_path_flag)$@
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished building $@!"
 
 clean:

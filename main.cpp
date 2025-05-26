@@ -83,11 +83,22 @@ int main() {
     makefile << "\tOS := $(shell uname)\n";
     makefile << "endif\n\n";
 
+    makefile << "include_path_flag := -I\n";
+    makefile << "library_path_flag := -L\n";
+    makefile << "output_path_flag := -o\n";
+    makefile << "link_flag := -l\n";
+    makefile << "static_flag := -static\n";
+    makefile << "shared_flag := -fPIC -shared\n";
     makefile << "obj_ext := .o\n";
     if (is_shared) {
         makefile << "out_ext := .so\n";
     }
     makefile << "ifeq ($(OS),Windows_NT)\n";
+    makefile << "\tlibrary_path_flag := /LIBPATH:\n";
+    makefile << "\toutput_path_flag := /Fe:\n";
+    makefile << "\tlink_flag :=\n";
+    makefile << "\tstatic_flag := /MT\n";
+    makefile << "\tshared_flag := /LD\n";
     makefile << "\tobj_ext := .obj\n";
     if (is_shared) {
         makefile << "\tout_ext := .dll\n";
@@ -100,17 +111,16 @@ int main() {
 
     makefile << "compilation_flags := " << compilation_flags;
     for (const auto& include_path : include_paths) {
-        makefile << " -I" << include_path;
+        makefile << " $(include_path_flag)" << include_path;
     }
     for (const auto& library_path : library_paths) {
-        makefile << " -L" << library_path;
+        makefile << " $(library_path_flag)" << library_path;
     }
     if (is_shared) {
-        makefile << " -fPIC";
-        makefile << " -shared";
+        makefile << " $(shared_flag)";
     }
     if (is_static) {
-        makefile << " -static";
+        makefile << " $(static_flag)";
     }
     if (!pkg_config_libraries.empty()) {
         makefile << " `pkg-config --cflags";
@@ -125,7 +135,7 @@ int main() {
 
     makefile << "libraries :=";
     for (const auto& library : libraries) {
-        makefile << " -l" << library;
+        makefile << " $(link_flag)" << library;
     }
     if (!pkg_config_libraries.empty()) {
         makefile << " `pkg-config --libs";
@@ -165,17 +175,16 @@ int main() {
 
             makefile << "\tcompilation_flags := " << custom_compilation_flags;
             for (const auto& include_path : include_paths) {
-                makefile << " -I" << include_path;
+                makefile << " $(include_path_flag)" << include_path;
             }
             for (const auto& library_path : custom_library_paths) {
-                makefile << " -L" << library_path;
+                makefile << " $(library_path_flag)" << library_path;
             }
             if (is_shared) {
-                makefile << " -fPIC";
-                makefile << " -shared";
+                makefile << " $(shared_flag)";
             }
             if (custom_is_static) {
-                makefile << " -static";
+                makefile << " $(static_flag)";
             }
             if (!custom_pkg_config_libraries.empty()) {
                 makefile << " `pkg-config --cflags";
@@ -190,7 +199,7 @@ int main() {
 
             makefile << "\tlibraries :=";
             for (const auto& library : custom_libraries) {
-                makefile << " -l" << library;
+                makefile << " $(link_flag)" << library;
             }
             if (!custom_pkg_config_libraries.empty()) {
                 makefile << " `pkg-config --libs";
@@ -248,7 +257,7 @@ int main() {
 
                 makefile << "\n\t" << echo("Compiling $@ from $<...") << '\n';
                 makefile << "\t@mkdir -p " << artifact_path << '\n';
-                makefile << "\t@\"$(compiler)\" -c $< $(compilation_flags) -o $@\n";
+                makefile << "\t@\"$(compiler)\" -c $< $(compilation_flags) $(output_path_flag)$@\n";
                 makefile << '\t' << echo("Finished compiling $@ from $<!") << '\n';
             }
         }
@@ -267,7 +276,7 @@ int main() {
             makefile << "\n\t@mkdir -p " << path.parent_path().generic_string();
         }
     }
-    makefile << "\n\t@\"$(compiler)\" $^ $(compilation_flags) $(link_time_flags) $(libraries) -o $@\n\t" << echo("Finished building $@!") << '\n';
+    makefile << "\n\t@\"$(compiler)\" $^ $(compilation_flags) $(link_time_flags) $(libraries) $(output_path_flag)$@\n\t" << echo("Finished building $@!") << '\n';
 
     makefile << "\nclean:";
     for (const auto& clean_prelude : clean_preludes) {
