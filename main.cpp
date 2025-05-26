@@ -298,7 +298,7 @@ int main() {
     for (unsigned int i = 0; i < preludes.size(); ++i) {
         wrapper << " prelude" << i;
     }
-    wrapper << "\n\t@$(MAKE) -f .polybuild.mk --no-print-directory\n";
+    wrapper << "\n\t@\"$(MAKE)\" -f .polybuild.mk --no-print-directory\n";
     wrapper << ".PHONY: all\n";
 
     for (unsigned int i = 0; i < preludes.size(); ++i) {
@@ -309,12 +309,12 @@ int main() {
     }
 
     wrapper << "\nclean:\n";
-    wrapper << "\t@$(MAKE) -f .polybuild.mk --no-print-directory $@\n";
+    wrapper << "\t@\"$(MAKE)\" -f .polybuild.mk --no-print-directory $@\n";
     wrapper << ".PHONY: clean\n";
 
     if (!install_path.empty()) {
         wrapper << "\ninstall:\n";
-        wrapper << "\t@$(MAKE) -f .polybuild.mk --no-print-directory $@\n";
+        wrapper << "\t@\"$(MAKE)\" -f .polybuild.mk --no-print-directory $@\n";
         wrapper << ".PHONY: install\n";
     }
 
