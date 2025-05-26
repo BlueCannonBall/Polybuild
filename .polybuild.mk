@@ -4,7 +4,6 @@ ifndef OS
 	OS := $(shell uname)
 endif
 
-include_path_flag := -I
 library_path_flag := -L
 output_path_flag := -o
 link_flag := -l

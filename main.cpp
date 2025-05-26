@@ -83,7 +83,6 @@ int main() {
     makefile << "\tOS := $(shell uname)\n";
     makefile << "endif\n\n";
 
-    makefile << "include_path_flag := -I\n";
     makefile << "library_path_flag := -L\n";
     makefile << "output_path_flag := -o\n";
     makefile << "link_flag := -l\n";
@@ -111,7 +110,7 @@ int main() {
 
     makefile << "compilation_flags := " << compilation_flags;
     for (const auto& include_path : include_paths) {
-        makefile << " $(include_path_flag)" << include_path;
+        makefile << " -I" << include_path;
     }
     for (const auto& library_path : library_paths) {
         makefile << " $(library_path_flag)" << library_path;
@@ -175,7 +174,7 @@ int main() {
 
             makefile << "\tcompilation_flags := " << custom_compilation_flags;
             for (const auto& include_path : include_paths) {
-                makefile << " $(include_path_flag)" << include_path;
+                makefile << " -I" << include_path;
             }
             for (const auto& library_path : custom_library_paths) {
                 makefile << " $(library_path_flag)" << library_path;
