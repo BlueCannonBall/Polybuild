@@ -248,7 +248,7 @@ int main() {
 
                 makefile << "\n\t" << echo("Compiling $@ from $<...") << '\n';
                 makefile << "\t@mkdir -p " << artifact_path << '\n';
-                makefile << "\t@$(compiler) -c $< $(compilation_flags) -o $@\n";
+                makefile << "\t@\"$(compiler)\" -c $< $(compilation_flags) -o $@\n";
                 makefile << '\t' << echo("Finished compiling $@ from $<!") << '\n';
             }
         }
@@ -267,7 +267,7 @@ int main() {
             makefile << "\n\t@mkdir -p " << path.parent_path().generic_string();
         }
     }
-    makefile << "\n\t@$(compiler) $^ $(compilation_flags) $(link_time_flags) $(libraries) -o $@\n\t" << echo("Finished building $@!") << '\n';
+    makefile << "\n\t@\"$(compiler)\" $^ $(compilation_flags) $(link_time_flags) $(libraries) -o $@\n\t" << echo("Finished building $@!") << '\n';
 
     makefile << "\nclean:";
     for (const auto& clean_prelude : clean_preludes) {
