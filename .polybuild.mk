@@ -28,7 +28,7 @@ link_time_flags := $(LDFLAGS)
 libraries :=
 
 ifeq ($(OS),Windows_NT)
-	compilation_flags := /W4 /std:c++17 /Ox
+	compilation_flags := /W4 /std:c++17 /EHsc /Ox
 	link_time_flags := $(LDFLAGS)
 	libraries :=
 endif

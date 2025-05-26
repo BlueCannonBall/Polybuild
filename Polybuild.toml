@@ -8,4 +8,4 @@ install = "/usr/local/bin"
 compilation-flags = "-Wall -std=c++17 -O3"
 
 [env.OS.Windows_NT.options]
-compilation-flags = "/W4 /std:c++17 /Ox"
+compilation-flags = "/W4 /std:c++17 /EHsc /Ox"
