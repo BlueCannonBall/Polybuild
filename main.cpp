@@ -90,6 +90,7 @@ int main() {
         makefile << "out_ext := .so\n";
     }
     makefile << "ifeq ($(OS),Windows_NT)\n";
+    makefile << "\tlink_flag := /link\n";
     makefile << "\tlibrary_path_flag := /LIBPATH:\n";
     makefile << "\tout_path_flag := /Fe:\n";
     makefile << "\tobj_path_flag := /Fo:\n";
@@ -128,7 +129,11 @@ int main() {
     }
     makefile << '\n';
 
-    makefile << "link_time_flags := " << link_time_flags << '\n';
+    makefile << "link_time_flags := " << link_time_flags;
+    for (const auto& library_path : library_paths) {
+        makefile << " $(library_path_flag)" << library_path;
+    }
+    makefile << '\n';
 
     makefile << "libraries :=";
     for (const auto& library : libraries) {
@@ -174,9 +179,6 @@ int main() {
             for (const auto& include_path : include_paths) {
                 makefile << " -I" << include_path;
             }
-            for (const auto& library_path : custom_library_paths) {
-                makefile << " $(library_path_flag)" << library_path;
-            }
             if (is_shared) {
                 makefile << " $(shared_flag)";
             }
@@ -192,7 +194,11 @@ int main() {
             }
             makefile << '\n';
 
-            makefile << "\tlink_time_flags := " << custom_link_time_flags << '\n';
+            makefile << "\tlink_time_flags := " << custom_link_time_flags;
+            for (const auto& library_path : custom_library_paths) {
+                makefile << " $(library_path_flag)" << library_path;
+            }
+            makefile << '\n';
 
             makefile << "\tlibraries :=";
             for (const auto& library : custom_libraries) {
@@ -273,7 +279,7 @@ int main() {
             makefile << "\n\t@mkdir -p " << path.parent_path().generic_string();
         }
     }
-    makefile << "\n\t@\"$(compiler)\" $^ $(compilation_flags) $(link_time_flags) $(libraries) $(out_path_flag)$@\n\t" << echo("Finished building $@!") << '\n';
+    makefile << "\n\t@\"$(compiler)\" $^ $(compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
 
     makefile << "\nclean:";
     for (const auto& clean_prelude : clean_preludes) {

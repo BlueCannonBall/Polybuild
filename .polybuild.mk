@@ -8,6 +8,7 @@ static_flag := -static
 shared_flag := -fPIC -shared
 obj_ext := .o
 ifeq ($(OS),Windows_NT)
+	link_flag := /link
 	library_path_flag := /LIBPATH:
 	out_path_flag := /Fe:
 	obj_path_flag := /Fo:
@@ -40,7 +41,7 @@ obj/main_0$(obj_ext): ./main.cpp ./toml.hpp ./toml/parser.hpp ./toml/combinator.
 
 polybuild$(out_ext): obj/main_0$(obj_ext) $(static_libraries)
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Building $@..."
-	@"$(compiler)" $^ $(compilation_flags) $(link_time_flags) $(libraries) $(out_path_flag)$@
+	@"$(compiler)" $^ $(compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished building $@!"
 
 clean:
