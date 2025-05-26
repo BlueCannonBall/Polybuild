@@ -95,6 +95,7 @@ int main() {
     makefile << "\tout_path_flag := /Fe:\n";
     makefile << "\tobj_path_flag := /Fo:\n";
     makefile << "\tlibrary_flag :=\n";
+    makefile << "\tpkg_config_syntax := --msvc-syntax\n";
     makefile << "\tstatic_flag := /MT\n";
     makefile << "\tshared_flag := /LD\n";
     makefile << "\tobj_ext := .obj\n";
@@ -121,7 +122,7 @@ int main() {
         makefile << " $(static_flag)";
     }
     if (!pkg_config_libraries.empty()) {
-        makefile << " `pkg-config --cflags";
+        makefile << " `pkg-config $(pkg_config_syntax) --cflags";
         for (const auto& pkg_config_library : pkg_config_libraries) {
             makefile << ' ' << pkg_config_library;
         }
@@ -140,7 +141,7 @@ int main() {
         makefile << " $(library_flag)" << library;
     }
     if (!pkg_config_libraries.empty()) {
-        makefile << " `pkg-config --libs";
+        makefile << " `pkg-config $(pkg_config_syntax) --libs";
         for (const auto& pkg_config_library : pkg_config_libraries) {
             makefile << ' ' << pkg_config_library;
         }
@@ -186,7 +187,7 @@ int main() {
                 makefile << " $(static_flag)";
             }
             if (!custom_pkg_config_libraries.empty()) {
-                makefile << " `pkg-config --cflags";
+                makefile << " `pkg-config $(pkg_config_syntax) --cflags";
                 for (const auto& pkg_config_library : custom_pkg_config_libraries) {
                     makefile << ' ' << pkg_config_library;
                 }
@@ -205,7 +206,7 @@ int main() {
                 makefile << " $(library_flag)" << library;
             }
             if (!custom_pkg_config_libraries.empty()) {
-                makefile << " `pkg-config --libs";
+                makefile << " `pkg-config $(pkg_config_syntax) --libs";
                 for (const auto& pkg_config_library : custom_pkg_config_libraries) {
                     makefile << ' ' << pkg_config_library;
                 }

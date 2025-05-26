@@ -13,6 +13,7 @@ ifeq ($(OS),Windows_NT)
 	out_path_flag := /Fe:
 	obj_path_flag := /Fo:
 	library_flag :=
+	pkg_config_syntax := --msvc-syntax
 	static_flag := /MT
 	shared_flag := /LD
 	obj_ext := .obj
