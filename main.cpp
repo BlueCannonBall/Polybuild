@@ -112,9 +112,6 @@ int main() {
     for (const auto& include_path : include_paths) {
         makefile << " -I" << include_path;
     }
-    for (const auto& library_path : library_paths) {
-        makefile << " $(library_path_flag)" << library_path;
-    }
     if (is_shared) {
         makefile << " $(shared_flag)";
     }
