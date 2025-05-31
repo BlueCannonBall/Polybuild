@@ -9,3 +9,4 @@ compilation-flags = "-Wall -std=c++17 -O3"
 
 [env.OS.Windows_NT.options]
 compilation-flags = "/W3 /std:c++17 /EHsc /Ox"
+static = true
