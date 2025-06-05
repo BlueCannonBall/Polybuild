@@ -29,11 +29,13 @@ compiler := $(CXX)
 compilation_flags := -Wall -std=c++17 -O3 $(dynamic_flag)
 link_time_flags := $(LDFLAGS)
 libraries :=
+prefix := /usr/local/bin
 
 ifeq ($(OS),Windows_NT)
 	compilation_flags := /W3 /std:c++17 /EHsc /Ox $(static_flag)
 	link_time_flags := $(LDFLAGS)
 	libraries :=
+	prefix := C:\Windows\System32
 endif
 
 all: polybuild$(out_ext)
@@ -57,7 +59,7 @@ clean:
 .PHONY: clean
 
 install:
-	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Copying polybuild$(out_ext) to /usr/local/bin..."
-	@cp polybuild$(out_ext) /usr/local/bin
-	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished copying polybuild to /usr/local/bin!"
+	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Copying polybuild$(out_ext) to $(prefix)..."
+	@cp polybuild$(out_ext) $(prefix)
+	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished copying polybuild$(out_ext) to $(prefix)!"
 .PHONY: install

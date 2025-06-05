@@ -161,11 +161,16 @@ int main() {
         makefile << '\n';
     }
 
+    if (!install_path.empty()) {
+        makefile << "prefix := " << install_path << '\n';
+    }
+
     auto env_table = toml::find_or<toml::table>(config, "env", {});
     for (const auto& env_var_table : env_table) {
         for (const auto& env_var_value_table : env_var_table.second.as_table()) {
             auto custom_paths_table = toml::find_or(env_var_value_table.second, "paths", {});
             auto custom_library_paths = toml::find_or<std::vector<std::string>>(custom_paths_table, "library", std::vector<std::string>(library_paths));
+            auto custom_install_path = toml::find_or<std::string>(custom_paths_table, "install", install_path);
 
             auto custom_options_table = toml::find_or(env_var_value_table.second, "options", {});
             auto custom_compilation_flags = toml::find_or<std::string>(custom_options_table, "compilation-flags", compilation_flags);
@@ -227,6 +232,10 @@ int main() {
                     makefile << ' ' << static_library;
                 }
                 makefile << '\n';
+            }
+
+            if (!custom_install_path.empty()) {
+                makefile << "\tprefix := " << custom_install_path << '\n';
             }
 
             makefile << "endif\n";
@@ -298,13 +307,11 @@ int main() {
     makefile << '\t' << echo("Finished deleting " + output_path + "$(out_ext) and " + artifact_path + '!') << '\n';
     makefile << ".PHONY: clean\n";
 
-    if (!install_path.empty()) {
-        makefile << "\ninstall:\n";
-        makefile << '\t' << echo("Copying " + output_path + "$(out_ext) to " + install_path + "...") << '\n';
-        makefile << "\t@cp " << output_path << "$(out_ext) " << install_path << '\n';
-        makefile << '\t' << echo("Finished copying " + output_path + " to " + install_path + '!') << '\n';
-        makefile << ".PHONY: install\n";
-    }
+    makefile << "\ninstall:\n";
+    makefile << '\t' << echo("Copying " + output_path + "$(out_ext) to $(prefix)...") << '\n';
+    makefile << "\t@cp " << output_path << "$(out_ext) $(prefix)\n";
+    makefile << '\t' << echo("Finished copying " + output_path + "$(out_ext) to $(prefix)!") << '\n';
+    makefile << ".PHONY: install\n";
 
     makefile.close();
     std::cout << log("Finished converting Polybuild.toml to makefile!") << std::endl;
@@ -322,6 +329,7 @@ int main() {
     wrapper << "\tCC := cl\n";
     wrapper << "\tCXX := cl\n";
     wrapper << "\tCL := /nologo\n";
+    wrapper << "\tLINK := /nologo\n";
     wrapper << "\tMSYS_NO_PATHCONV := 1\n";
     wrapper << "\texport CC CXX CL MSYS_NO_PATHCONV\n";
     wrapper << "endif\n";
@@ -344,11 +352,9 @@ int main() {
     wrapper << "\t@\"$(MAKE)\" -f .polybuild.mk --no-print-directory $@\n";
     wrapper << ".PHONY: clean\n";
 
-    if (!install_path.empty()) {
-        wrapper << "\ninstall:\n";
-        wrapper << "\t@\"$(MAKE)\" -f .polybuild.mk --no-print-directory $@\n";
-        wrapper << ".PHONY: install\n";
-    }
+    wrapper << "\ninstall:\n";
+    wrapper << "\t@\"$(MAKE)\" -f .polybuild.mk --no-print-directory $@\n";
+    wrapper << ".PHONY: install\n";
 
     wrapper.close();
     std::cout << log("Finished producing makefile wrapper!") << std::endl;

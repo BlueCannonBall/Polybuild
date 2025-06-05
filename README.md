@@ -26,6 +26,7 @@ static = false # Equivalent to the -static option of a compiler (default: false)
 # Environment variables can be used to change Makefile behavior at runtime
 [env.OS.Windows_NT]
 paths.library = ["winlib"]
+paths.install = "C:\\Windows\\System32"
 options.compiler = "clang++"
 options.compilation-flags = "-Wall -std=c++17 -O2"
 options.link-time-flags = "-lws2_32"
