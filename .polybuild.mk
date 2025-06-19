@@ -32,7 +32,7 @@ libraries :=
 prefix := /usr/local/bin
 
 ifeq ($(OS),Windows_NT)
-	compilation_flags := /W3 /std:c++17 /EHsc /Ox $(static_flag)
+	compilation_flags := /W3 /std:c++17 /EHsc /O2 $(static_flag)
 	link_time_flags := $(LDFLAGS)
 	libraries :=
 	prefix := C:\Windows\System32

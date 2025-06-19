@@ -11,5 +11,5 @@ compilation-flags = "-Wall -std=c++17 -O3"
 install = "C:\\Windows\\System32"
 
 [env.OS.Windows_NT.options]
-compilation-flags = "/W3 /std:c++17 /EHsc /Ox"
+compilation-flags = "/W3 /std:c++17 /EHsc /O2"
 static = true
