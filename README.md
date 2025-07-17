@@ -13,9 +13,13 @@ artifact = "obj" # Where to put .o files (no default)
 install = "/usr/local/bin" # Where to put the output binary when `make install` is executed (default: empty)
 
 [options]
-compiler = "g++" # The compiler to use (default: your system default C++ compiler)
-compilation-flags = "-Wall -std=c++17 -O3" # Options passed to the compiler (default: your system default C++ compiler flags)
-link-time-flags = "-lX11" # Options passed to the compiler only at link time
+c-compiler = "gcc" # The C compiler to use (default: your system default C compiler)
+cpp-compiler = "g++" # The C++ compiler to use (default: your system default C++ compiler)
+compiler = "g++" # Alias for cpp-compiler
+c-compilation-flags = "-Wall -O3" # Options passed to the compiler (default: your system default C compiler flags)
+cpp-compilation-flags = "-Wall -std=c++17 -O3" # Options passed to the compiler (default: your system default C++ compiler flags)
+compilation-flags = "-Wall -std=c++17 -O3" # Alias for cpp-compilation-flags
+link-time-flags = "-lX11" # Options passed to the compiler only at link time, placed after /link on Windows (defaylt: empty)
 libraries = ["ssl"] # Equivalent to the -l option of a compiler (default: empty)
 pkg-config-libraries = ["gstreamer-1.0"] # A list of libraries added to `compilation-flags` and `libraries` with `pkg-config`
 preludes = ["echo this is an arbitrary command that always runs", "echo these commands may execute in parallel"] # (default: empty)
@@ -27,14 +31,16 @@ static = false # Equivalent to the -static option of a compiler (default: false)
 [env.OS.Windows_NT]
 paths.library = ["winlib"]
 paths.install = "C:\\Windows\\System32"
-options.compiler = "clang++"
-options.compilation-flags = "-Wall -std=c++17 -O2"
+options.compiler = "clang++" # c-compiler and cpp-compiler can be overrided as well
+options.compilation-flags = "-Wall -std=c++17 -O2" # c-compilation-flags and cpp-compilation-flags can be overrided as well
 options.link-time-flags = "-lws2_32"
-options.libraries = ["ssl", "ws2_32"]
+options.libraries = ["ssl", "crypto", "ws2_32"]
 options.pkg-config-libraries = ["gstreamer-1.0", "glew"]
 options.static = true
 ```
-Then, run Polybuild in the root directory. This generates a Makefile in the same directory. This file should only be regenerated (by running Polybuild again) when you add new files to your project or when you add new includes. The generated Makefile is safe to push to GitHub repositories, as it is the same regardless of the environment in which it was generated. It does not divulge any sensitive information.
+Then, run Polybuild in the root directory. This generates a Makefile in the same directory. This file should only be regenerated (by running Polybuild again) when you update the Polybuild.toml, add new files to your project, or add new includes. The generated Makefile is safe to push to GitHub repositories, as it functions the same regardless of the environment in which it was generated. It does not divulge any sensitive information.
+
+Polybuild automatically builds `.c` files with a C compiler and `.cpp`/`.cc`/`.cxx` files with a C++ compiler.
 
 ## Installation One-Liner
 ```sh
