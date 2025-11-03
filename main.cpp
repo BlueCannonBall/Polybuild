@@ -273,7 +273,7 @@ int main() {
                     }
                 }
                 makefile << '\n'
-                         << object_path.generic_string() << "$(obj_ext): " << entry.path().generic_string();
+                         << object_path.generic_string() << "$(obj_ext): " << entry.path().generic_string() << " .polybuild.mk";
 
                 std::vector<std::filesystem::path> dependencies;
                 find_dependencies(entry.path(), include_paths, dependencies);
@@ -294,23 +294,23 @@ int main() {
         }
     }
 
-    makefile << '\n'
-             << output_path << "$(out_ext):";
+    makefile << "\nobjects := ";
     for (const auto& object_path : object_paths) {
         makefile << ' ' << object_path.generic_string() << "$(obj_ext)";
     }
-    makefile << " $(static_libraries)";
-    makefile << "\n\t" << echo("Building $@...");
+
+    makefile << output_path << "\n$(out_ext): .polybuild.mk $(objects) $(static_libraries)\n";
+    makefile << "\t" << echo("Building $@...") << '\n';
     {
         auto path = std::filesystem::path(output_path);
         if (path.has_parent_path()) {
-            makefile << "\n\t@mkdir -p " << path.parent_path().generic_string();
+            makefile << "\t@mkdir -p " << path.parent_path().generic_string() << '\n';
         }
     }
     if (has_cpp) {
-        makefile << "\n\t@\"$(cpp_compiler)\" $^ $(cpp_compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
+        makefile << "\t@\"$(cpp_compiler)\" $(objects) $(static_libraries) $(cpp_compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
     } else {
-        makefile << "\n\t@\"$(c_compiler)\" $^ $(c_compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
+        makefile << "\t@\"$(c_compiler)\" $(objects) $(static_libraries) $(c_compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
     }
 
     makefile << "\nclean:";
