@@ -280,8 +280,9 @@ int main() {
                 for (const auto& depdendency : dependencies) {
                     makefile << ' ' << depdendency.generic_string();
                 }
+                makefile << '\n';
 
-                makefile << "\n\t" << echo("Compiling $@ from $<...") << '\n';
+                makefile << '\t' << echo("Compiling $@ from $<...") << '\n';
                 makefile << "\t@mkdir -p " << artifact_path << '\n';
                 if (file_type == SOURCE_FILE_CPP) {
                     makefile << "\t@\"$(cpp_compiler)\" $(compile_only_flag) $< $(cpp_compilation_flags) $(obj_path_flag)$@\n";
@@ -298,8 +299,9 @@ int main() {
     for (const auto& object_path : object_paths) {
         makefile << ' ' << object_path.generic_string() << "$(obj_ext)";
     }
+    makefile << '\n';
 
-    makefile << output_path << "\n$(out_ext): .polybuild.mk $(objects) $(static_libraries)\n";
+    makefile << output_path << "$(out_ext): .polybuild.mk $(objects) $(static_libraries)\n";
     makefile << "\t" << echo("Building $@...") << '\n';
     {
         auto path = std::filesystem::path(output_path);
