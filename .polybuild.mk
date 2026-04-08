@@ -5,8 +5,13 @@ library_path_flag := -L
 obj_path_flag := -o
 out_path_flag := -o
 library_flag := -l
+dynamic_flag :=
 static_flag := -static
 shared_flag := -shared -fPIC
+debug_compilation_flag := -g
+debug_link_flag :=
+active_debug_compilation_flag :=
+active_debug_link_flag :=
 compile_only_flag := -c
 obj_ext := .o
 ifeq ($(OS),Windows_NT)
@@ -17,6 +22,10 @@ ifeq ($(OS),Windows_NT)
 	library_flag :=
 	dynamic_flag := /MD
 	static_flag := /MT
+	debug_dynamic_flag := /MDd
+	debug_static_flag := /MTd
+	debug_compilation_flag := /Zi
+	debug_link_flag := /DEBUG
 	shared_flag := /LD
 	compile_only_flag := /c
 	link_flag := /link
@@ -25,20 +34,31 @@ ifeq ($(OS),Windows_NT)
 	out_ext := .exe
 endif
 
+ifeq ($(PROFILE),debug)
+	active_debug_compilation_flag := $(debug_compilation_flag)
+	active_debug_link_flag := $(debug_link_flag)
+	ifeq ($(OS),Windows_NT)
+		dynamic_flag := $(debug_dynamic_flag)
+		static_flag := $(debug_static_flag)
+	endif
+endif
+
 c_compiler := $(CC)
 cpp_compiler := $(CXX)
-c_compilation_flags := $(CFLAGS) $(dynamic_flag)
-cpp_compilation_flags := -Wall -std=c++17 -O3 $(dynamic_flag)
-link_time_flags := $(LDFLAGS)
+c_compilation_flags := $(CFLAGS) $(active_debug_compilation_flag) $(dynamic_flag)
+cpp_compilation_flags := -Wall -std=c++17 -O3 $(active_debug_compilation_flag) $(dynamic_flag)
+link_time_flags := $(LDFLAGS) $(active_debug_link_flag)
+link_time_flags_ext :=
+link_time_flags += $(link_time_flags_ext)
 libraries :=
 prefix := /usr/local/bin
 
 ifeq ($(OS),Windows_NT)
 	c_compiler := $(CC)
 	cpp_compiler := $(CXX)
-	c_compilation_flags := $(CFLAGS) $(static_flag)
-	cpp_compilation_flags := /W3 /std:c++17 /EHsc /O2 $(static_flag)
-	link_time_flags := $(LDFLAGS)
+	c_compilation_flags := $(CFLAGS) $(active_debug_compilation_flag) $(static_flag)
+	cpp_compilation_flags := /W3 /std:c++17 /EHsc /O2 $(active_debug_compilation_flag) $(static_flag)
+	link_time_flags := $(LDFLAGS) $(active_debug_link_flag)
 	libraries :=
 	prefix := C:\Windows\System32
 endif

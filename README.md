@@ -27,18 +27,33 @@ clean-preludes = ["echo this is an arbitrary command that runs with the clean ta
 shared = false # Equivalent to the -shared and -fPIC options of a compiler (default: false)
 static = false # Equivalent to the -static option of a compiler (default: false)
 
-# Environment variables can be used to change Makefile behavior at runtime
+# Environment variable overrides
 [env.OS.Windows_NT]
-paths.library = ["winlib"]
-paths.install = "C:\\Windows\\System32"
-options.compiler = "clang++" # c-compiler and cpp-compiler can be overrided as well
-options.compilation-flags = "-Wall -std=c++17 -O2" # c-compilation-flags and cpp-compilation-flags can be overrided as well
-options.link-time-flags = "-lws2_32"
-options.libraries = ["ssl", "crypto", "ws2_32"]
-options.pkg-config-libraries = ["gstreamer-1.0", "glew"]
-options.static = true
+options.compiler = "cl" # Automatically switches to MSVC-style flags (/I, /Fo, etc.)
+
+# Nested environment overrides (Hierarchical)
+[env.OS.Windows_NT.env.PROFILE.debug]
+options.compilation-flags = "/Zi /Od" # MSVC-specific debug flags
+
+[env.OS.Linux.env.PROFILE.debug]
+options.compilation-flags = "-g -O0" # GCC-specific debug flags
 ```
-Then, run Polybuild in the root directory. This generates a Makefile in the same directory. This file should only be regenerated (by running Polybuild again) when you update the Polybuild.toml, add new files to your project, or add new includes. The generated Makefile is safe to push to GitHub repositories, as it functions the same regardless of the environment in which it was generated. It does not divulge any sensitive information.
+Then, run Polybuild in the root directory to generate the `Makefile` and `.polybuild.mk`.
+
+## Build Profiles
+
+Polybuild includes a built-in `PROFILE` variable (defaulting to `release`). You can trigger different behaviors by passing it to `make`:
+
+```bash
+make PROFILE=debug
+```
+
+### Automatic Debug Support
+When `PROFILE=debug` is used, Polybuild automatically:
+*   **Windows (MSVC)**: Swaps `/MD` to `/MDd` (or `/MT` to `/MTd`) and appends `/Zi` to compiler flags and `/DEBUG` to linker flags.
+*   **Linux/Unix**: Appends `-g` to compiler flags.
+
+You can explicitly control this behavior with `options.debug = true/false` in any environment block.
 
 Polybuild automatically builds `.c` files with a C compiler and `.cpp`/`.cc`/`.cxx` files with a C++ compiler.
 
