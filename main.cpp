@@ -207,7 +207,7 @@ int main() {
     if (!static_libraries.empty()) {
         makefile << "static_libraries :=";
         for (const auto& static_library : static_libraries) {
-            makefile << ' ' << std::quoted(static_library);
+            makefile << ' ' << static_library;
         }
         makefile << '\n';
     }
@@ -264,7 +264,7 @@ int main() {
                 auto custom_static_libraries = toml::find<std::vector<std::string>>(custom_options_table, "static-libraries");
                 makefile << "\tstatic_libraries :=";
                 for (const auto& static_library : custom_static_libraries) {
-                    makefile << ' ' << std::quoted(static_library);
+                    makefile << ' ' << static_library;
                 }
                 makefile << '\n';
             }
