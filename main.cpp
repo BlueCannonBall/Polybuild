@@ -179,28 +179,26 @@ int main() {
     makefile << "\tactive_static_flag := $(debug_static_flag)\n";
     makefile << "endif\n\n";
 
-    makefile << "c_compiler := " << c_compiler << '\n';
-    makefile << "cpp_compiler := " << cpp_compiler << '\n';
+    makefile << "c_compiler := " << std::quoted(c_compiler) << '\n';
+    makefile << "cpp_compiler := " << std::quoted(cpp_compiler) << '\n';
 
     generate_compilation_flags(makefile, "c_compilation_flags", c_compilation_flags, include_paths, is_shared, is_static, pkg_config_libraries);
     generate_compilation_flags(makefile, "cpp_compilation_flags", cpp_compilation_flags, include_paths, is_shared, is_static, pkg_config_libraries);
 
-    makefile << "link_time_flags := " << link_time_flags << " $(active_debug_link_flag)\n";
-
-    makefile << "link_time_flags_ext :=";
+    makefile << "link_time_flags := " << link_time_flags << " $(active_debug_link_flag)";
     for (const auto& library_path : library_paths) {
-        makefile << " $(library_path_flag)" << library_path;
+        makefile << " $(library_path_flag)" << std::quoted(library_path);
     }
-    makefile << "\nlink_time_flags += $(link_time_flags_ext)\n";
+    makefile << '\n';
 
     makefile << "libraries :=";
     for (const auto& library : libraries) {
-        makefile << " $(library_flag)" << library;
+        makefile << " $(library_flag)" << std::quoted(library);
     }
     if (!pkg_config_libraries.empty()) {
         makefile << " `pkg-config $(pkg_config_syntax) --libs";
         for (const auto& pkg_config_library : pkg_config_libraries) {
-            makefile << ' ' << pkg_config_library;
+            makefile << ' ' << std::quoted(pkg_config_library);
         }
         makefile << '`';
     }
@@ -209,13 +207,13 @@ int main() {
     if (!static_libraries.empty()) {
         makefile << "static_libraries :=";
         for (const auto& static_library : static_libraries) {
-            makefile << ' ' << static_library;
+            makefile << ' ' << std::quoted(static_library);
         }
         makefile << '\n';
     }
 
     if (!install_path.empty()) {
-        makefile << "prefix := " << install_path << '\n';
+        makefile << "prefix := " << std::quoted(install_path) << '\n';
     }
 
     auto env_table = toml::find_or<toml::table>(config, "env", {});
@@ -237,26 +235,26 @@ int main() {
 
             makefile << "\nifeq ($(" << env_var_table.first << ")," << env_var_value_table.first << ")\n";
 
-            makefile << "\tc_compiler := " << custom_c_compiler << '\n';
-            makefile << "\tcpp_compiler := " << custom_cpp_compiler << '\n';
+            makefile << "\tc_compiler := " << std::quoted(custom_c_compiler) << '\n';
+            makefile << "\tcpp_compiler := " << std::quoted(custom_cpp_compiler) << '\n';
 
             generate_compilation_flags(makefile << '\t', "c_compilation_flags", custom_c_compilation_flags, include_paths, is_shared, custom_is_static, custom_pkg_config_libraries);
             generate_compilation_flags(makefile << '\t', "cpp_compilation_flags", custom_cpp_compilation_flags, include_paths, is_shared, custom_is_static, custom_pkg_config_libraries);
 
             makefile << "\tlink_time_flags := " << custom_link_time_flags;
             for (const auto& library_path : custom_library_paths) {
-                makefile << " $(library_path_flag)" << library_path;
+                makefile << " $(library_path_flag)" << std::quoted(library_path);
             }
             makefile << '\n';
 
             makefile << "\tlibraries :=";
             for (const auto& library : custom_libraries) {
-                makefile << " $(library_flag)" << library;
+                makefile << " $(library_flag)" << std::quoted(library);
             }
             if (!custom_pkg_config_libraries.empty()) {
                 makefile << " `pkg-config $(pkg_config_syntax) --libs";
                 for (const auto& pkg_config_library : custom_pkg_config_libraries) {
-                    makefile << ' ' << pkg_config_library;
+                    makefile << ' ' << std::quoted(pkg_config_library);
                 }
                 makefile << '`';
             }
@@ -266,13 +264,13 @@ int main() {
                 auto custom_static_libraries = toml::find<std::vector<std::string>>(custom_options_table, "static-libraries");
                 makefile << "\tstatic_libraries :=";
                 for (const auto& static_library : custom_static_libraries) {
-                    makefile << ' ' << static_library;
+                    makefile << ' ' << std::quoted(static_library);
                 }
                 makefile << '\n';
             }
 
             if (!custom_install_path.empty()) {
-                makefile << "\tprefix := " << custom_install_path << '\n';
+                makefile << "\tprefix := " << std::quoted(custom_install_path) << '\n';
             }
 
             makefile << "endif\n";
@@ -311,10 +309,10 @@ int main() {
                 makefile << '\t' << echo("Compiling $@ from $<...") << '\n';
                 makefile << "\t@mkdir -p " << artifact_path << '\n';
                 if (file_type == SOURCE_FILE_CPP) {
-                    makefile << "\t@\"$(cpp_compiler)\" $(compile_only_flag) $< $(cpp_compilation_flags) $(obj_path_flag)$@\n";
+                    makefile << "\t@$(cpp_compiler) $(compile_only_flag) $< $(cpp_compilation_flags) $(obj_path_flag)$@\n";
                     has_cpp = true;
                 } else {
-                    makefile << "\t@\"$(c_compiler)\" $(compile_only_flag) $< $(c_compilation_flags) $(obj_path_flag)$@\n";
+                    makefile << "\t@$(c_compiler) $(compile_only_flag) $< $(c_compilation_flags) $(obj_path_flag)$@\n";
                 }
                 makefile << '\t' << echo("Finished compiling $@ from $<!") << '\n';
             }
@@ -336,9 +334,9 @@ int main() {
         }
     }
     if (has_cpp) {
-        makefile << "\t@\"$(cpp_compiler)\" $(objects) $(static_libraries) $(cpp_compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
+        makefile << "\t@$(cpp_compiler) $(objects) $(static_libraries) $(cpp_compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
     } else {
-        makefile << "\t@\"$(c_compiler)\" $(objects) $(static_libraries) $(c_compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
+        makefile << "\t@$(c_compiler) $(objects) $(static_libraries) $(c_compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
     }
 
     makefile << "\nclean:";
