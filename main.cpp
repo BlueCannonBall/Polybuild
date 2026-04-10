@@ -1,4 +1,5 @@
 #include "toml.hpp"
+#include "util.hpp"
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -292,8 +293,7 @@ int main() {
     std::vector<std::filesystem::path> object_paths;
     bool has_cpp = false;
     for (std::filesystem::path source_path : source_paths) {
-        for (std::filesystem::directory_entry entry :
-            std::filesystem::directory_iterator(source_path)) {
+        for (std::filesystem::directory_entry entry : SortedDirectoryIterator(source_path)) {
             if (SourceFileType file_type; entry.is_regular_file() && (file_type = get_source_file_type(entry.path())) != SOURCE_FILE_NONE) {
                 std::filesystem::path object_path;
                 for (unsigned int i = 0;; ++i) {
