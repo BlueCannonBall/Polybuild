@@ -34,8 +34,7 @@ void find_dependencies(const std::filesystem::path& path, const std::vector<std:
     std::ifstream source_file(path);
     for (std::string line; std::getline(source_file, line);) {
         std::smatch matches;
-        if (std::regex_match(line, matches, angled_include_regex) ||
-            std::regex_match(line, matches, quoted_include_regex)) {
+        if (std::regex_match(line, matches, quoted_include_regex)) {
             // First, check locally
             auto header_path = path.parent_path() / std::filesystem::path(std::string(matches[1]));
             if (std::filesystem::is_regular_file(header_path)) {
@@ -47,6 +46,16 @@ void find_dependencies(const std::filesystem::path& path, const std::vector<std:
             }
 
             // Then, check the include path
+            for (std::filesystem::path include_path : include_paths) {
+                auto header_path = include_path / std::filesystem::path(std::string(matches[1]));
+                if (std::filesystem::is_regular_file(header_path)) {
+                    if (std::find(ret.begin(), ret.end(), header_path) == ret.end()) {
+                        ret.push_back(header_path);
+                        find_dependencies(header_path, include_paths, ret);
+                    }
+                }
+            }
+        } else if (std::regex_match(line, matches, angled_include_regex)) {
             for (std::filesystem::path include_path : include_paths) {
                 auto header_path = include_path / std::filesystem::path(std::string(matches[1]));
                 if (std::filesystem::is_regular_file(header_path)) {
