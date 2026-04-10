@@ -58,10 +58,15 @@ public:
         return *this;
     }
 
+    SortedDirectoryIterator& increment(std::error_code& ec) {
+        ec.clear();
+        return ++(*this);
+    }
+
     SortedDirectoryIterator operator++(int) {
-        SortedDirectoryIterator tmp = *this;
+        SortedDirectoryIterator ret = *this;
         ++(*this);
-        return tmp;
+        return ret;
     }
 
     bool operator==(const SortedDirectoryIterator& other) const noexcept {
