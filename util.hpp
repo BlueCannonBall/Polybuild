@@ -19,8 +19,12 @@ public:
         SortedDirectoryIterator(path, std::filesystem::directory_options::none) {}
     SortedDirectoryIterator(const std::filesystem::path& path, std::filesystem::directory_options options):
         entries(std::make_shared<std::vector<std::filesystem::directory_entry>>()) {
-        for (const auto& entry : std::filesystem::directory_iterator(path, options)) {
-            entries->push_back(entry);
+        if (std::filesystem::is_regular_file(path)) {
+            entries->push_back(std::filesystem::directory_entry(path));
+        } else {
+            for (const auto& entry : std::filesystem::directory_iterator(path, options)) {
+                entries->push_back(entry);
+            }
         }
         init();
     }
