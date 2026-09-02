@@ -251,7 +251,7 @@ int main() {
             generate_compilation_flags(makefile << '\t', "c_compilation_flags", custom_c_compilation_flags, include_paths, is_shared, custom_is_static, custom_pkg_config_libraries);
             generate_compilation_flags(makefile << '\t', "cpp_compilation_flags", custom_cpp_compilation_flags, include_paths, is_shared, custom_is_static, custom_pkg_config_libraries);
 
-            makefile << "\tlink_time_flags := " << custom_link_time_flags;
+            makefile << "\tlink_time_flags := " << custom_link_time_flags << " $(active_debug_link_flag)";
             for (const auto& library_path : custom_library_paths) {
                 makefile << " $(library_path_flag)" << std::quoted(library_path);
             }
