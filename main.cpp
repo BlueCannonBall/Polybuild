@@ -37,15 +37,15 @@ SourceFileType get_source_file_type(std::filesystem::path path) {
 }
 
 void find_dependencies(const std::filesystem::path& path, const std::vector<std::string>& include_paths, std::vector<std::filesystem::path>& ret) {
-    const static std::regex angled_include_regex("^\\s*#\\s*include\\s*<(.+)>.*$", std::regex::optimize);
-    const static std::regex quoted_include_regex("^\\s*#\\s*include\\s*\"(.+)\".*$", std::regex::optimize);
+    const static std::regex angled_include_regex("^\\s*#\\s*include\\s*<([^>]+)>.*$", std::regex::optimize);
+    const static std::regex quoted_include_regex("^\\s*#\\s*include\\s*\"([^\"]+)\".*$", std::regex::optimize);
 
     std::ifstream source_file(path);
     for (std::string line; std::getline(source_file, line);) {
         std::smatch matches;
         if (std::regex_match(line, matches, quoted_include_regex)) {
             // First, check locally
-            auto header_path = path.parent_path() / std::filesystem::path(std::string(matches[1]));
+            auto header_path = (path.parent_path() / std::filesystem::path(std::string(matches[1]))).lexically_normal();
             if (std::filesystem::is_regular_file(header_path)) {
                 if (std::find(ret.begin(), ret.end(), header_path) == ret.end()) {
                     ret.push_back(header_path);
@@ -56,7 +56,7 @@ void find_dependencies(const std::filesystem::path& path, const std::vector<std:
 
             // Then, check the include path
             for (std::filesystem::path include_path : include_paths) {
-                auto header_path = include_path / std::filesystem::path(std::string(matches[1]));
+                auto header_path = (include_path / std::filesystem::path(std::string(matches[1]))).lexically_normal();
                 if (std::filesystem::is_regular_file(header_path)) {
                     if (std::find(ret.begin(), ret.end(), header_path) == ret.end()) {
                         ret.push_back(header_path);
@@ -66,7 +66,7 @@ void find_dependencies(const std::filesystem::path& path, const std::vector<std:
             }
         } else if (std::regex_match(line, matches, angled_include_regex)) {
             for (std::filesystem::path include_path : include_paths) {
-                auto header_path = include_path / std::filesystem::path(std::string(matches[1]));
+                auto header_path = (include_path / std::filesystem::path(std::string(matches[1]))).lexically_normal();
                 if (std::filesystem::is_regular_file(header_path)) {
                     if (std::find(ret.begin(), ret.end(), header_path) == ret.end()) {
                         ret.push_back(header_path);

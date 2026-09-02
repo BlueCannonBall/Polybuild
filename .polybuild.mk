@@ -61,7 +61,7 @@ ifeq ($(OS),Windows_NT)
 	cpp_compiler := "$(CXX)"
 	c_compilation_flags := $(CFLAGS) $(active_debug_compilation_flag) $(active_static_flag)
 	cpp_compilation_flags := /W3 /std:c++17 /EHsc /O2 $(active_debug_compilation_flag) $(active_static_flag)
-	link_time_flags := $(LDFLAGS)
+	link_time_flags := $(LDFLAGS) $(active_debug_link_flag)
 	libraries :=
 	prefix := "C:\\Windows\\System32"
 endif
@@ -69,7 +69,7 @@ endif
 all: polybuild$(out_ext)
 .PHONY: all
 
-obj/main_0$(obj_ext): ./main.cpp .polybuild.mk ./toml.hpp ./toml/parser.hpp ./toml/combinator.hpp ./toml/region.hpp ./toml/color.hpp ./toml/result.hpp ./toml/traits.hpp ./toml/from.hpp ./toml/into.hpp ./toml/version.hpp ./toml/utility.hpp ./toml/lexer.hpp ./toml/macros.hpp ./toml/types.hpp ./toml/comments.hpp ./toml/datetime.hpp ./toml/string.hpp ./toml/value.hpp ./toml/exception.hpp ./toml/source_location.hpp ./toml/storage.hpp ./toml/literal.hpp ./toml/serializer.hpp ./toml/get.hpp ./util.hpp
+obj/main_0$(obj_ext): ./main.cpp .polybuild.mk toml.hpp toml/parser.hpp toml/combinator.hpp toml/region.hpp toml/color.hpp toml/result.hpp toml/traits.hpp toml/from.hpp toml/into.hpp toml/version.hpp toml/utility.hpp toml/lexer.hpp toml/macros.hpp toml/types.hpp toml/comments.hpp toml/datetime.hpp toml/string.hpp toml/value.hpp toml/exception.hpp toml/source_location.hpp toml/storage.hpp toml/literal.hpp toml/serializer.hpp toml/get.hpp util.hpp
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Compiling $@ from $<..."
 	@mkdir -p obj
 	@$(cpp_compiler) $(compile_only_flag) $< $(cpp_compilation_flags) $(obj_path_flag)$@
