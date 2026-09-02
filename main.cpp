@@ -8,12 +8,20 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 enum SourceFileType {
     SOURCE_FILE_C,
     SOURCE_FILE_CPP,
     SOURCE_FILE_NONE,
+};
+
+struct EnvBlock {
+    unsigned int line;
+    std::string variable;
+    std::string value;
+    const toml::value* table;
 };
 
 SourceFileType get_source_file_type(std::filesystem::path path) {
@@ -83,7 +91,7 @@ std::string log(const std::string& str) {
 std::ostream& generate_compilation_flags(std::ostream& os, const std::string& variable, const std::string& flags, const std::vector<std::string>& include_paths, bool is_shared, bool is_static, const std::vector<std::string>& pkg_config_libraries) {
     os << variable << " := " << flags << " $(active_debug_compilation_flag)";
     for (const auto& include_path : include_paths) {
-        os << " $(include_path_flag)" << include_path;
+        os << " $(include_path_flag)" << std::quoted(include_path);
     }
     if (is_shared) {
         os << " $(shared_flag)";
@@ -226,65 +234,72 @@ int main() {
         makefile << "prefix := " << std::quoted(install_path) << '\n';
     }
 
+    std::vector<EnvBlock> env_blocks;
     auto env_table = toml::find_or<toml::table>(config, "env", {});
     for (const auto& env_var_table : env_table) {
         for (const auto& env_var_value_table : env_var_table.second.as_table()) {
-            auto custom_paths_table = toml::find_or(env_var_value_table.second, "paths", {});
-            auto custom_library_paths = toml::find_or<std::vector<std::string>>(custom_paths_table, "library", std::vector<std::string>(library_paths));
-            auto custom_install_path = toml::find_or<std::string>(custom_paths_table, "install", install_path);
-
-            auto custom_options_table = toml::find_or(env_var_value_table.second, "options", {});
-            auto custom_c_compiler = toml::find_or<std::string>(custom_options_table, "c-compiler", c_compiler);
-            auto custom_cpp_compiler = toml::find_or<std::string>(custom_options_table, "cpp-compiler", toml::find_or<std::string>(custom_options_table, "compiler", cpp_compiler));
-            auto custom_c_compilation_flags = toml::find_or<std::string>(custom_options_table, "c-compilation-flags", c_compilation_flags);
-            auto custom_cpp_compilation_flags = toml::find_or<std::string>(custom_options_table, "cpp-compilation-flags", toml::find_or(custom_options_table, "compilation-flags", cpp_compilation_flags));
-            auto custom_link_time_flags = toml::find_or<std::string>(custom_options_table, "link-time-flags", link_time_flags);
-            auto custom_libraries = toml::find_or<std::vector<std::string>>(custom_options_table, "libraries", std::vector<std::string>(libraries));
-            auto custom_pkg_config_libraries = toml::find_or<std::vector<std::string>>(custom_options_table, "pkg-config-libraries", std::vector<std::string>(pkg_config_libraries));
-            auto custom_is_static = toml::find_or<bool>(custom_options_table, "static", is_static);
-
-            makefile << "\nifeq ($(" << env_var_table.first << ")," << env_var_value_table.first << ")\n";
-
-            makefile << "\tc_compiler := " << std::quoted(custom_c_compiler) << '\n';
-            makefile << "\tcpp_compiler := " << std::quoted(custom_cpp_compiler) << '\n';
-
-            generate_compilation_flags(makefile << '\t', "c_compilation_flags", custom_c_compilation_flags, include_paths, is_shared, custom_is_static, custom_pkg_config_libraries);
-            generate_compilation_flags(makefile << '\t', "cpp_compilation_flags", custom_cpp_compilation_flags, include_paths, is_shared, custom_is_static, custom_pkg_config_libraries);
-
-            makefile << "\tlink_time_flags := " << custom_link_time_flags << " $(active_debug_link_flag)";
-            for (const auto& library_path : custom_library_paths) {
-                makefile << " $(library_path_flag)" << std::quoted(library_path);
-            }
-            makefile << '\n';
-
-            makefile << "\tlibraries :=";
-            for (const auto& library : custom_libraries) {
-                makefile << " $(library_flag)" << std::quoted(library);
-            }
-            if (!custom_pkg_config_libraries.empty()) {
-                makefile << " `pkg-config $(pkg_config_syntax) --libs";
-                for (const auto& pkg_config_library : custom_pkg_config_libraries) {
-                    makefile << ' ' << std::quoted(pkg_config_library);
-                }
-                makefile << '`';
-            }
-            makefile << '\n';
-
-            if (custom_options_table.contains("static-libraries")) {
-                auto custom_static_libraries = toml::find<std::vector<std::string>>(custom_options_table, "static-libraries");
-                makefile << "\tstatic_libraries :=";
-                for (const auto& static_library : custom_static_libraries) {
-                    makefile << ' ' << static_library;
-                }
-                makefile << '\n';
-            }
-
-            if (!custom_install_path.empty()) {
-                makefile << "\tprefix := " << std::quoted(custom_install_path) << '\n';
-            }
-
-            makefile << "endif\n";
+            env_blocks.push_back({env_var_value_table.second.location().line(), env_var_table.first, env_var_value_table.first, &env_var_value_table.second});
         }
+    }
+    std::sort(env_blocks.begin(), env_blocks.end(), [](const EnvBlock& a, const EnvBlock& b) {
+        return std::tie(a.line, a.variable, a.value) < std::tie(b.line, b.variable, b.value);
+    });
+    for (const auto& env_block : env_blocks) {
+        auto custom_paths_table = toml::find_or(*env_block.table, "paths", {});
+        auto custom_library_paths = toml::find_or<std::vector<std::string>>(custom_paths_table, "library", std::vector<std::string>(library_paths));
+        auto custom_install_path = toml::find_or<std::string>(custom_paths_table, "install", install_path);
+
+        auto custom_options_table = toml::find_or(*env_block.table, "options", {});
+        auto custom_c_compiler = toml::find_or<std::string>(custom_options_table, "c-compiler", c_compiler);
+        auto custom_cpp_compiler = toml::find_or<std::string>(custom_options_table, "cpp-compiler", toml::find_or<std::string>(custom_options_table, "compiler", cpp_compiler));
+        auto custom_c_compilation_flags = toml::find_or<std::string>(custom_options_table, "c-compilation-flags", c_compilation_flags);
+        auto custom_cpp_compilation_flags = toml::find_or<std::string>(custom_options_table, "cpp-compilation-flags", toml::find_or(custom_options_table, "compilation-flags", cpp_compilation_flags));
+        auto custom_link_time_flags = toml::find_or<std::string>(custom_options_table, "link-time-flags", link_time_flags);
+        auto custom_libraries = toml::find_or<std::vector<std::string>>(custom_options_table, "libraries", std::vector<std::string>(libraries));
+        auto custom_pkg_config_libraries = toml::find_or<std::vector<std::string>>(custom_options_table, "pkg-config-libraries", std::vector<std::string>(pkg_config_libraries));
+        auto custom_is_static = toml::find_or<bool>(custom_options_table, "static", is_static);
+
+        makefile << "\nifeq ($(" << env_block.variable << ")," << env_block.value << ")\n";
+
+        makefile << "\tc_compiler := " << std::quoted(custom_c_compiler) << '\n';
+        makefile << "\tcpp_compiler := " << std::quoted(custom_cpp_compiler) << '\n';
+
+        generate_compilation_flags(makefile << '\t', "c_compilation_flags", custom_c_compilation_flags, include_paths, is_shared, custom_is_static, custom_pkg_config_libraries);
+        generate_compilation_flags(makefile << '\t', "cpp_compilation_flags", custom_cpp_compilation_flags, include_paths, is_shared, custom_is_static, custom_pkg_config_libraries);
+
+        makefile << "\tlink_time_flags := " << custom_link_time_flags << " $(active_debug_link_flag)";
+        for (const auto& library_path : custom_library_paths) {
+            makefile << " $(library_path_flag)" << std::quoted(library_path);
+        }
+        makefile << '\n';
+
+        makefile << "\tlibraries :=";
+        for (const auto& library : custom_libraries) {
+            makefile << " $(library_flag)" << std::quoted(library);
+        }
+        if (!custom_pkg_config_libraries.empty()) {
+            makefile << " `pkg-config $(pkg_config_syntax) --libs";
+            for (const auto& pkg_config_library : custom_pkg_config_libraries) {
+                makefile << ' ' << std::quoted(pkg_config_library);
+            }
+            makefile << '`';
+        }
+        makefile << '\n';
+
+        if (custom_options_table.contains("static-libraries")) {
+            auto custom_static_libraries = toml::find<std::vector<std::string>>(custom_options_table, "static-libraries");
+            makefile << "\tstatic_libraries :=";
+            for (const auto& static_library : custom_static_libraries) {
+                makefile << ' ' << static_library;
+            }
+            makefile << '\n';
+        }
+
+        if (!custom_install_path.empty()) {
+            makefile << "\tprefix := " << std::quoted(custom_install_path) << '\n';
+        }
+
+        makefile << "endif\n";
     }
 
     makefile << "\nall: " << output_path << "$(out_ext)\n";
