@@ -104,7 +104,7 @@ std::ostream& generate_compilation_flags(std::ostream& os, const std::string& va
     if (!pkg_config_libraries.empty()) {
         os << " `pkg-config $(pkg_config_syntax) --cflags";
         for (const auto& pkg_config_library : pkg_config_libraries) {
-            os << ' ' << pkg_config_library;
+            os << ' ' << std::quoted(pkg_config_library);
         }
         os << '`';
     }
@@ -331,12 +331,12 @@ int main() {
                 makefile << '\n';
 
                 makefile << '\t' << echo("Compiling $@ from $<...") << '\n';
-                makefile << "\t@mkdir -p " << artifact_path << '\n';
+                makefile << "\t@mkdir -p " << std::quoted(artifact_path) << '\n';
                 if (file_type == SOURCE_FILE_CPP) {
-                    makefile << "\t@$(cpp_compiler) $(compile_only_flag) $< $(cpp_compilation_flags) $(obj_path_flag)$@\n";
+                    makefile << "\t@$(cpp_compiler) $(compile_only_flag) \"$<\" $(cpp_compilation_flags) \"$(obj_path_flag)$@\"\n";
                     has_cpp = true;
                 } else {
-                    makefile << "\t@$(c_compiler) $(compile_only_flag) $< $(c_compilation_flags) $(obj_path_flag)$@\n";
+                    makefile << "\t@$(c_compiler) $(compile_only_flag) \"$<\" $(c_compilation_flags) \"$(obj_path_flag)$@\"\n";
                 }
                 makefile << '\t' << echo("Finished compiling $@ from $<!") << '\n';
             }
@@ -354,13 +354,13 @@ int main() {
     {
         auto path = std::filesystem::path(output_path);
         if (path.has_parent_path()) {
-            makefile << "\t@mkdir -p " << path.parent_path().generic_string() << '\n';
+            makefile << "\t@mkdir -p " << std::quoted(path.parent_path().generic_string()) << '\n';
         }
     }
     if (has_cpp) {
-        makefile << "\t@$(cpp_compiler) $(objects) $(static_libraries) $(cpp_compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
+        makefile << "\t@$(cpp_compiler) $(objects) $(static_libraries) $(cpp_compilation_flags) \"$(out_path_flag)$@\" $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
     } else {
-        makefile << "\t@$(c_compiler) $(objects) $(static_libraries) $(c_compilation_flags) $(out_path_flag)$@ $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
+        makefile << "\t@$(c_compiler) $(objects) $(static_libraries) $(c_compilation_flags) \"$(out_path_flag)$@\" $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
     }
 
     makefile << "\nclean:";
@@ -369,13 +369,13 @@ int main() {
         makefile << "\n\t@" << clean_prelude;
     }
     makefile << "\n\t" << echo("Deleting " + output_path + "$(out_ext) and " + artifact_path + "...") << '\n';
-    makefile << "\t@rm -rf " << output_path << "$(out_ext) " << artifact_path << '\n';
+    makefile << "\t@rm -rf " << std::quoted(output_path + "$(out_ext)") << ' ' << std::quoted(artifact_path) << '\n';
     makefile << '\t' << echo("Finished deleting " + output_path + "$(out_ext) and " + artifact_path + '!') << '\n';
     makefile << ".PHONY: clean\n";
 
     makefile << "\ninstall:\n";
     makefile << '\t' << echo("Copying " + output_path + "$(out_ext) to $(prefix)...") << '\n';
-    makefile << "\t@cp " << output_path << "$(out_ext) $(prefix)\n";
+    makefile << "\t@cp " << std::quoted(output_path + "$(out_ext)") << " $(prefix)\n";
     makefile << '\t' << echo("Finished copying " + output_path + "$(out_ext) to $(prefix)!") << '\n';
     makefile << ".PHONY: install\n";
 
