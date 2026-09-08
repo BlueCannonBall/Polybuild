@@ -36,3 +36,4 @@
 obj/
 polybuild
 compile_commands.json
+__pycache__/

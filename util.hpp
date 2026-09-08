@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <stddef.h>
+#include <utility>
 #include <vector>
 
 class SortedDirectoryIterator {
@@ -14,7 +15,7 @@ public:
     typedef const std::filesystem::directory_entry& reference;
     typedef std::input_iterator_tag iterator_category;
 
-    SortedDirectoryIterator() noexcept = default;
+    SortedDirectoryIterator() = default;
     explicit SortedDirectoryIterator(const std::filesystem::path& path):
         SortedDirectoryIterator(path, std::filesystem::directory_options::none) {}
     SortedDirectoryIterator(const std::filesystem::path& path, std::filesystem::directory_options options):
@@ -28,19 +29,28 @@ public:
         }
         init();
     }
-    SortedDirectoryIterator(const std::filesystem::path& path, std::error_code& ec) noexcept:
+    SortedDirectoryIterator(const std::filesystem::path& path, std::error_code& ec):
         SortedDirectoryIterator(path, std::filesystem::directory_options::none, ec) {}
-    SortedDirectoryIterator(const std::filesystem::path& path, std::filesystem::directory_options options, std::error_code& ec) noexcept:
+    SortedDirectoryIterator(const std::filesystem::path& path, std::filesystem::directory_options options, std::error_code& ec):
         entries(std::make_shared<std::vector<std::filesystem::directory_entry>>()) {
-        std::filesystem::directory_iterator it(path, options, ec);
-        if (!ec) {
-            for (const auto& entry : it) {
-                entries->push_back(entry);
+        if (std::filesystem::is_regular_file(path, ec)) {
+            std::filesystem::directory_entry entry(path, ec);
+            if (!ec) {
+                entries->push_back(std::move(entry));
             }
-            init();
-        } else {
-            entries = nullptr; // Act as an end iterator on failure
+        } else if (!ec) {
+            std::filesystem::directory_iterator it(path, options, ec);
+            const std::filesystem::directory_iterator end;
+            while (!ec && it != end) {
+                entries->push_back(*it);
+                it.increment(ec);
+            }
         }
+        if (ec) {
+            entries.reset(); // Act as an end iterator on failure
+            return;
+        }
+        init();
     }
 
     reference operator*() const {
@@ -73,7 +83,7 @@ public:
         return ret;
     }
 
-    bool operator==(const SortedDirectoryIterator& other) const noexcept {
+    bool operator==(const SortedDirectoryIterator& other) const {
         if (!entries && !other.entries) {
             return true;
         }
@@ -83,7 +93,7 @@ public:
         return false;
     }
 
-    bool operator!=(const SortedDirectoryIterator& other) const noexcept {
+    bool operator!=(const SortedDirectoryIterator& other) const {
         return !(*this == other);
     }
 
@@ -102,10 +112,10 @@ private:
     }
 };
 
-inline SortedDirectoryIterator begin(SortedDirectoryIterator it) noexcept {
+inline SortedDirectoryIterator begin(SortedDirectoryIterator it) {
     return it;
 }
 
-inline SortedDirectoryIterator end(const SortedDirectoryIterator&) noexcept {
+inline SortedDirectoryIterator end(const SortedDirectoryIterator&) {
     return SortedDirectoryIterator();
 }

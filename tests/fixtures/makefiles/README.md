@@ -1,0 +1,1 @@
+These fixtures were generated with the original main.cpp and util.hpp from commit deb9b2921144a4e5c44c066d2bc4ab9dd7f8f311 on Linux. Inputs are defined in tests/test_makefile_output.py. Expected bytes must come from that original generator, not the implementation under test.

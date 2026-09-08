@@ -16,7 +16,7 @@ compile_only_flag := -c
 link_flag :=
 pkg_config_syntax :=
 obj_ext := .o
-out_ext :=
+out_ext := .so
 ifeq ($(OS),Windows_NT)
 	include_path_flag := /I
 	library_path_flag := /LIBPATH:
@@ -34,7 +34,7 @@ ifeq ($(OS),Windows_NT)
 	link_flag := /link
 	pkg_config_syntax := --msvc-syntax
 	obj_ext := .obj
-	out_ext := .exe
+	out_ext := .dll
 endif
 
 active_dynamic_flag := $(release_dynamic_flag)
@@ -50,51 +50,47 @@ endif
 
 c_compiler := "$(CC)"
 cpp_compiler := "$(CXX)"
-c_compilation_flags := $(CFLAGS) $(active_debug_compilation_flag) $(active_dynamic_flag)
-cpp_compilation_flags := -Wall -std=c++17 -O3 $(active_debug_compilation_flag) $(active_dynamic_flag)
+c_compilation_flags := $(CFLAGS) $(active_debug_compilation_flag) $(include_path_flag)"include" $(shared_flag) $(active_dynamic_flag)
+cpp_compilation_flags := $(CXXFLAGS) $(active_debug_compilation_flag) $(include_path_flag)"include" $(shared_flag) $(active_dynamic_flag)
 link_time_flags := $(LDFLAGS) $(active_debug_link_flag)
 libraries :=
-prefix := "/usr/local/bin"
 
-ifeq ($(OS),Windows_NT)
-	c_compiler := "$(CC)"
-	cpp_compiler := "$(CXX)"
-	c_compilation_flags := $(CFLAGS) $(active_debug_compilation_flag) $(active_static_flag)
-	cpp_compilation_flags := /W3 /std:c++17 /EHsc /O2 $(active_debug_compilation_flag) $(active_static_flag)
-	link_time_flags := $(LDFLAGS) $(active_debug_link_flag)
-	libraries :=
-	prefix := "C:\\Windows\\System32"
-endif
-
-all: polybuild$(out_ext)
+all: lib/example$(out_ext)
 .PHONY: all
 
-obj/build_0$(obj_ext): ./build.cpp .polybuild.mk build.hpp toml.hpp toml/parser.hpp toml/combinator.hpp toml/region.hpp toml/color.hpp toml/result.hpp toml/traits.hpp toml/from.hpp toml/into.hpp toml/version.hpp toml/utility.hpp toml/lexer.hpp toml/macros.hpp toml/types.hpp toml/comments.hpp toml/datetime.hpp toml/string.hpp toml/value.hpp toml/exception.hpp toml/source_location.hpp toml/storage.hpp toml/literal.hpp toml/serializer.hpp toml/get.hpp util.hpp
+shared-objects/extra_0$(obj_ext): cpp/extra.cc .polybuild.mk include/common.h include/nested.h
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Compiling $@ from $<..."
-	@mkdir -p "obj"
+	@mkdir -p "shared-objects"
 	@$(cpp_compiler) $(compile_only_flag) "$<" $(cpp_compilation_flags) "$(obj_path_flag)$@"
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished compiling $@ from $<!"
 
-obj/main_0$(obj_ext): ./main.cpp .polybuild.mk build.hpp
+shared-objects/main_0$(obj_ext): cpp/main.cpp .polybuild.mk include/common.h include/nested.h cpp/windows.h
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Compiling $@ from $<..."
-	@mkdir -p "obj"
+	@mkdir -p "shared-objects"
 	@$(cpp_compiler) $(compile_only_flag) "$<" $(cpp_compilation_flags) "$(obj_path_flag)$@"
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished compiling $@ from $<!"
 
-objects :=  obj/build_0$(obj_ext) obj/main_0$(obj_ext)
-polybuild$(out_ext): .polybuild.mk $(objects) $(static_libraries)
+shared-objects/other_0$(obj_ext): cpp/other.cxx .polybuild.mk include/common.h include/nested.h
+	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Compiling $@ from $<..."
+	@mkdir -p "shared-objects"
+	@$(cpp_compiler) $(compile_only_flag) "$<" $(cpp_compilation_flags) "$(obj_path_flag)$@"
+	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished compiling $@ from $<!"
+
+objects :=  shared-objects/extra_0$(obj_ext) shared-objects/main_0$(obj_ext) shared-objects/other_0$(obj_ext)
+lib/example$(out_ext): .polybuild.mk $(objects) $(static_libraries)
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Building $@..."
+	@mkdir -p "lib"
 	@$(cpp_compiler) $(objects) $(static_libraries) $(cpp_compilation_flags) "$(out_path_flag)$@" $(link_flag) $(link_time_flags) $(libraries)
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished building $@!"
 
 clean:
-	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Deleting polybuild$(out_ext) and obj..."
-	@rm -rf "polybuild$(out_ext)" "obj"
-	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished deleting polybuild$(out_ext) and obj!"
+	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Deleting lib/example$(out_ext) and shared-objects..."
+	@rm -rf "lib/example$(out_ext)" "shared-objects"
+	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished deleting lib/example$(out_ext) and shared-objects!"
 .PHONY: clean
 
 install:
-	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Copying polybuild$(out_ext) to $(prefix)..."
-	@cp "polybuild$(out_ext)" $(prefix)
-	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished copying polybuild$(out_ext) to $(prefix)!"
+	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Copying lib/example$(out_ext) to $(prefix)..."
+	@cp "lib/example$(out_ext)" $(prefix)
+	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished copying lib/example$(out_ext) to $(prefix)!"
 .PHONY: install

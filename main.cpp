@@ -1,434 +1,135 @@
-#include "toml.hpp"
-#include "util.hpp"
-#include <algorithm>
+#include "build.hpp"
 #include <filesystem>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
-#include <regex>
-#include <sstream>
+#include <stdexcept>
 #include <string>
-#include <tuple>
-#include <vector>
 
-enum SourceFileType {
-    SOURCE_FILE_C,
-    SOURCE_FILE_CPP,
-    SOURCE_FILE_NONE,
+struct Arguments {
+    std::string command = "generate";
+    std::filesystem::path directory;
+    std::filesystem::path config = "Polybuild.toml";
+    bool help = false;
+    bool version = false;
 };
 
-struct EnvBlock {
-    unsigned int line;
-    std::string variable;
-    std::string value;
-    const toml::value* table;
-};
-
-SourceFileType get_source_file_type(std::filesystem::path path) {
-    if (path.extension() == ".c") {
-        return SOURCE_FILE_C;
-    } else if (path.extension() == ".cpp" ||
-               path.extension() == ".cc" ||
-               path.extension() == ".cxx") {
-        return SOURCE_FILE_CPP;
-    } else {
-        return SOURCE_FILE_NONE;
-    }
+void print_help() {
+    std::cout << "Usage: polybuild [command] [options]\n\n"
+                 "Commands:\n"
+                 "  generate       Generate Makefile and .polybuild.mk (default)\n"
+                 "  init           Create a minimal Polybuild.toml\n"
+                 "  check          Validate configuration and discover sources without writing\n\n"
+                 "Options:\n"
+                 "  -C <directory> Change directory before running the command\n"
+                 "  --config <file> Use a different configuration file\n"
+                 "  -h, --help     Show this help\n"
+                 "  --version      Show the version\n\n"
+                 "Build with Make: make MODE=debug\n";
 }
 
-void find_dependencies(const std::filesystem::path& path, const std::vector<std::string>& include_paths, std::vector<std::filesystem::path>& ret) {
-    const static std::regex angled_include_regex("^\\s*#\\s*include\\s*<([^>]+)>.*$", std::regex::optimize);
-    const static std::regex quoted_include_regex("^\\s*#\\s*include\\s*\"([^\"]+)\".*$", std::regex::optimize);
+Arguments parse_arguments(int argc, char** argv) {
+    Arguments ret;
+    bool has_command = false;
 
-    std::ifstream source_file(path);
-    for (std::string line; std::getline(source_file, line);) {
-        std::smatch matches;
-        if (std::regex_match(line, matches, quoted_include_regex)) {
-            // First, check locally
-            auto header_path = (path.parent_path() / std::filesystem::path(std::string(matches[1]))).lexically_normal();
-            if (std::filesystem::is_regular_file(header_path)) {
-                if (std::find(ret.begin(), ret.end(), header_path) == ret.end()) {
-                    ret.push_back(header_path);
-                    find_dependencies(header_path, include_paths, ret);
-                    continue;
-                }
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        auto value = [&]() -> std::string {
+            if (++i == argc || std::string(argv[i]).empty()) {
+                throw std::invalid_argument("Missing value for " + arg);
             }
+            return argv[i];
+        };
 
-            // Then, check the include path
-            for (std::filesystem::path include_path : include_paths) {
-                auto header_path = (include_path / std::filesystem::path(std::string(matches[1]))).lexically_normal();
-                if (std::filesystem::is_regular_file(header_path)) {
-                    if (std::find(ret.begin(), ret.end(), header_path) == ret.end()) {
-                        ret.push_back(header_path);
-                        find_dependencies(header_path, include_paths, ret);
-                    }
-                }
-            }
-        } else if (std::regex_match(line, matches, angled_include_regex)) {
-            for (std::filesystem::path include_path : include_paths) {
-                auto header_path = (include_path / std::filesystem::path(std::string(matches[1]))).lexically_normal();
-                if (std::filesystem::is_regular_file(header_path)) {
-                    if (std::find(ret.begin(), ret.end(), header_path) == ret.end()) {
-                        ret.push_back(header_path);
-                        find_dependencies(header_path, include_paths, ret);
-                    }
-                }
-            }
+        if (arg == "-h" || arg == "--help") {
+            ret.help = true;
+        } else if (arg == "--version") {
+            ret.version = true;
+        } else if (arg == "-C") {
+            auto directory = std::filesystem::path(value());
+            ret.directory = ret.directory / directory;
+        } else if (arg == "--config") {
+            ret.config = value();
+        } else if (!arg.empty() && arg[0] == '-') {
+            throw std::invalid_argument("Unknown option: " + arg);
+        } else if (!has_command) {
+            ret.command = arg;
+            has_command = true;
+        } else {
+            throw std::invalid_argument("Unexpected argument: " + arg);
         }
     }
+
+    if (ret.command != "generate" && ret.command != "init" && ret.command != "check") {
+        throw std::invalid_argument("Unknown command: " + ret.command);
+    }
+    return ret;
 }
 
-std::string echo(const std::string& str) {
-    std::ostringstream ss;
-    ss << "@printf \"\\033[1m[POLYBUILD]\\033[0m %s\\n\"" << ' ' << std::quoted(str);
-    return ss.str();
+bool write_changed(const std::filesystem::path& path, const std::string& contents) {
+    std::ifstream existing(path);
+    if (existing && std::string(std::istreambuf_iterator<char>(existing), {}) == contents) {
+        return false;
+    }
+    existing.close();
+
+    auto temporary_path = path;
+    temporary_path += ".tmp";
+    try {
+        std::ofstream file;
+        file.exceptions(std::ios::failbit | std::ios::badbit);
+        file.open(temporary_path, std::ios::out | std::ios::trunc);
+        file << contents;
+        file.close();
+        std::filesystem::rename(temporary_path, path);
+    } catch (...) {
+        std::error_code error;
+        std::filesystem::remove(temporary_path, error);
+        throw;
+    }
+    return true;
 }
 
-std::string log(const std::string& str) {
-    return "\033[1m[POLYBUILD]\033[0m " + str;
-}
-
-std::ostream& generate_compilation_flags(std::ostream& os, const std::string& variable, const std::string& flags, const std::vector<std::string>& include_paths, bool is_shared, bool is_static, const std::vector<std::string>& pkg_config_libraries) {
-    os << variable << " := " << flags << " $(active_debug_compilation_flag)";
-    for (const auto& include_path : include_paths) {
-        os << " $(include_path_flag)" << std::quoted(include_path);
-    }
-    if (is_shared) {
-        os << " $(shared_flag)";
-    }
-    if (is_static) {
-        os << " $(active_static_flag)";
-    } else {
-        os << " $(active_dynamic_flag)";
-    }
-    if (!pkg_config_libraries.empty()) {
-        os << " `pkg-config $(pkg_config_syntax) --cflags";
-        for (const auto& pkg_config_library : pkg_config_libraries) {
-            os << ' ' << std::quoted(pkg_config_library);
+int main(int argc, char** argv) {
+    try {
+        auto args = parse_arguments(argc, argv);
+        if (args.help) {
+            print_help();
+            return 0;
         }
-        os << '`';
-    }
-    os << '\n';
-    return os;
-}
-
-int main() {
-    std::cout << log("Converting Polybuild.toml to makefile...") << std::endl;
-    auto config = toml::parse("Polybuild.toml");
-
-    auto paths_table = toml::find(config, "paths");
-    auto output_path = toml::find<std::string>(paths_table, "output");
-    auto source_paths = toml::find<std::vector<std::string>>(paths_table, "source");
-    auto include_paths = toml::find_or<std::vector<std::string>>(paths_table, "include", {});
-    auto library_paths = toml::find_or<std::vector<std::string>>(paths_table, "library", {});
-    auto artifact_path = toml::find<std::string>(paths_table, "artifact");
-    auto install_path = toml::find_or<std::string>(paths_table, "install", {});
-
-    auto options_table = toml::find(config, "options");
-    auto c_compiler = toml::find_or<std::string>(options_table, "c-compiler", "$(CC)");
-    auto cpp_compiler = toml::find_or<std::string>(options_table, "cpp-compiler", toml::find_or<std::string>(options_table, "compiler", "$(CXX)"));
-    auto c_compilation_flags = toml::find_or<std::string>(options_table, "c-compilation-flags", "$(CFLAGS)");
-    auto cpp_compilation_flags = toml::find_or<std::string>(options_table, "cpp-compilation-flags", toml::find_or<std::string>(options_table, "compilation-flags", "$(CXXFLAGS)"));
-    auto link_time_flags = toml::find_or<std::string>(options_table, "link-time-flags", "$(LDFLAGS)");
-    auto libraries = toml::find_or<std::vector<std::string>>(options_table, "libraries", {});
-    auto static_libraries = toml::find_or<std::vector<std::string>>(options_table, "static-libraries", {});
-    auto pkg_config_libraries = toml::find_or<std::vector<std::string>>(options_table, "pkg-config-libraries", {});
-    auto preludes = toml::find_or<std::vector<std::string>>(options_table, "preludes", {});
-    auto clean_preludes = toml::find_or<std::vector<std::string>>(options_table, "clean-preludes", {});
-    auto is_shared = toml::find_or<bool>(options_table, "shared", false);
-    auto is_static = toml::find_or<bool>(options_table, "static", false);
-
-    std::ofstream makefile(".polybuild.mk");
-    makefile << "# This file was auto-generated by Polybuild\n\n";
-
-    makefile << "include_path_flag := -I\n";
-    makefile << "library_path_flag := -L\n";
-    makefile << "obj_path_flag := -o\n";
-    makefile << "out_path_flag := -o\n";
-    makefile << "library_flag := -l\n";
-    makefile << "release_dynamic_flag :=\n";
-    makefile << "release_static_flag := -static\n";
-    makefile << "debug_dynamic_flag :=\n";
-    makefile << "debug_static_flag := -static\n";
-    makefile << "debug_compilation_flag := -g\n";
-    makefile << "debug_link_flag :=\n";
-    makefile << "shared_flag := -shared -fPIC\n";
-    makefile << "compile_only_flag := -c\n";
-    makefile << "link_flag :=\n";
-    makefile << "pkg_config_syntax :=\n";
-    makefile << "obj_ext := .o\n";
-    if (is_shared) {
-        makefile << "out_ext := .so\n";
-    } else {
-        makefile << "out_ext :=\n";
-    }
-    makefile << "ifeq ($(OS),Windows_NT)\n";
-    makefile << "\tinclude_path_flag := /I\n";
-    makefile << "\tlibrary_path_flag := /LIBPATH:\n";
-    makefile << "\tobj_path_flag := /Fo:\n";
-    makefile << "\tout_path_flag := /Fe:\n";
-    makefile << "\tlibrary_flag :=\n";
-    makefile << "\trelease_dynamic_flag := /MD\n";
-    makefile << "\trelease_static_flag := /MT\n";
-    makefile << "\tdebug_dynamic_flag := /MDd\n";
-    makefile << "\tdebug_static_flag := /MTd\n";
-    makefile << "\tdebug_compilation_flag := /Zi\n";
-    makefile << "\tdebug_link_flag := /DEBUG\n";
-    makefile << "\tshared_flag := /LD\n";
-    makefile << "\tcompile_only_flag := /c\n";
-    makefile << "\tlink_flag := /link\n";
-    makefile << "\tpkg_config_syntax := --msvc-syntax\n";
-    makefile << "\tobj_ext := .obj\n";
-    if (is_shared) {
-        makefile << "\tout_ext := .dll\n";
-    } else {
-        makefile << "\tout_ext := .exe\n";
-    }
-    makefile << "endif\n\n";
-
-    makefile << "active_dynamic_flag := $(release_dynamic_flag)\n";
-    makefile << "active_static_flag := $(release_static_flag)\n";
-    makefile << "active_debug_compilation_flag :=\n";
-    makefile << "active_debug_link_flag :=\n";
-    makefile << "ifeq ($(MODE),debug)\n";
-    makefile << "\tactive_debug_compilation_flag := $(debug_compilation_flag)\n";
-    makefile << "\tactive_debug_link_flag := $(debug_link_flag)\n";
-    makefile << "\tactive_dynamic_flag := $(debug_dynamic_flag)\n";
-    makefile << "\tactive_static_flag := $(debug_static_flag)\n";
-    makefile << "endif\n\n";
-
-    makefile << "c_compiler := " << std::quoted(c_compiler) << '\n';
-    makefile << "cpp_compiler := " << std::quoted(cpp_compiler) << '\n';
-
-    generate_compilation_flags(makefile, "c_compilation_flags", c_compilation_flags, include_paths, is_shared, is_static, pkg_config_libraries);
-    generate_compilation_flags(makefile, "cpp_compilation_flags", cpp_compilation_flags, include_paths, is_shared, is_static, pkg_config_libraries);
-
-    makefile << "link_time_flags := " << link_time_flags << " $(active_debug_link_flag)";
-    for (const auto& library_path : library_paths) {
-        makefile << " $(library_path_flag)" << std::quoted(library_path);
-    }
-    makefile << '\n';
-
-    makefile << "libraries :=";
-    for (const auto& library : libraries) {
-        makefile << " $(library_flag)" << std::quoted(library);
-    }
-    if (!pkg_config_libraries.empty()) {
-        makefile << " `pkg-config $(pkg_config_syntax) --libs";
-        for (const auto& pkg_config_library : pkg_config_libraries) {
-            makefile << ' ' << std::quoted(pkg_config_library);
+        if (args.version) {
+            std::cout << "Polybuild\n";
+            return 0;
         }
-        makefile << '`';
-    }
-    makefile << '\n';
 
-    if (!static_libraries.empty()) {
-        makefile << "static_libraries :=";
-        for (const auto& static_library : static_libraries) {
-            makefile << ' ' << static_library;
+        if (!args.directory.empty()) {
+            std::filesystem::current_path(args.directory);
         }
-        makefile << '\n';
-    }
 
-    if (!install_path.empty()) {
-        makefile << "prefix := " << std::quoted(install_path) << '\n';
-    }
-
-    std::vector<EnvBlock> env_blocks;
-    auto env_table = toml::find_or<toml::table>(config, "env", {});
-    for (const auto& env_var_table : env_table) {
-        for (const auto& env_var_value_table : env_var_table.second.as_table()) {
-            env_blocks.push_back({env_var_value_table.second.location().line(), env_var_table.first, env_var_value_table.first, &env_var_value_table.second});
-        }
-    }
-    std::sort(env_blocks.begin(), env_blocks.end(), [](const EnvBlock& a, const EnvBlock& b) {
-        return std::tie(a.line, a.variable, a.value) < std::tie(b.line, b.variable, b.value);
-    });
-    for (const auto& env_block : env_blocks) {
-        auto custom_paths_table = toml::find_or(*env_block.table, "paths", {});
-        auto custom_library_paths = toml::find_or<std::vector<std::string>>(custom_paths_table, "library", std::vector<std::string>(library_paths));
-        auto custom_install_path = toml::find_or<std::string>(custom_paths_table, "install", install_path);
-
-        auto custom_options_table = toml::find_or(*env_block.table, "options", {});
-        auto custom_c_compiler = toml::find_or<std::string>(custom_options_table, "c-compiler", c_compiler);
-        auto custom_cpp_compiler = toml::find_or<std::string>(custom_options_table, "cpp-compiler", toml::find_or<std::string>(custom_options_table, "compiler", cpp_compiler));
-        auto custom_c_compilation_flags = toml::find_or<std::string>(custom_options_table, "c-compilation-flags", c_compilation_flags);
-        auto custom_cpp_compilation_flags = toml::find_or<std::string>(custom_options_table, "cpp-compilation-flags", toml::find_or(custom_options_table, "compilation-flags", cpp_compilation_flags));
-        auto custom_link_time_flags = toml::find_or<std::string>(custom_options_table, "link-time-flags", link_time_flags);
-        auto custom_libraries = toml::find_or<std::vector<std::string>>(custom_options_table, "libraries", std::vector<std::string>(libraries));
-        auto custom_pkg_config_libraries = toml::find_or<std::vector<std::string>>(custom_options_table, "pkg-config-libraries", std::vector<std::string>(pkg_config_libraries));
-        auto custom_is_static = toml::find_or<bool>(custom_options_table, "static", is_static);
-
-        makefile << "\nifeq ($(" << env_block.variable << ")," << env_block.value << ")\n";
-
-        makefile << "\tc_compiler := " << std::quoted(custom_c_compiler) << '\n';
-        makefile << "\tcpp_compiler := " << std::quoted(custom_cpp_compiler) << '\n';
-
-        generate_compilation_flags(makefile << '\t', "c_compilation_flags", custom_c_compilation_flags, include_paths, is_shared, custom_is_static, custom_pkg_config_libraries);
-        generate_compilation_flags(makefile << '\t', "cpp_compilation_flags", custom_cpp_compilation_flags, include_paths, is_shared, custom_is_static, custom_pkg_config_libraries);
-
-        makefile << "\tlink_time_flags := " << custom_link_time_flags << " $(active_debug_link_flag)";
-        for (const auto& library_path : custom_library_paths) {
-            makefile << " $(library_path_flag)" << std::quoted(library_path);
-        }
-        makefile << '\n';
-
-        makefile << "\tlibraries :=";
-        for (const auto& library : custom_libraries) {
-            makefile << " $(library_flag)" << std::quoted(library);
-        }
-        if (!custom_pkg_config_libraries.empty()) {
-            makefile << " `pkg-config $(pkg_config_syntax) --libs";
-            for (const auto& pkg_config_library : custom_pkg_config_libraries) {
-                makefile << ' ' << std::quoted(pkg_config_library);
+        if (args.command == "init") {
+            if (std::filesystem::exists(args.config)) {
+                throw std::runtime_error("Refusing to overwrite " + args.config.string());
             }
-            makefile << '`';
-        }
-        makefile << '\n';
 
-        if (custom_options_table.contains("static-libraries")) {
-            auto custom_static_libraries = toml::find<std::vector<std::string>>(custom_options_table, "static-libraries");
-            makefile << "\tstatic_libraries :=";
-            for (const auto& static_library : custom_static_libraries) {
-                makefile << ' ' << static_library;
-            }
-            makefile << '\n';
+            write_changed(args.config, "# Paths are relative to the project directory.\n[paths]\noutput = \"app\"\nsource = [\".\"]\n# Object files are stored in this directory.\nartifact = \"obj\"\n\n[options]\n# Uses CC/CXX and CFLAGS/CXXFLAGS from Make by default.\n");
+            std::cout << "Created " << args.config.string() << '\n';
+            return 0;
         }
 
-        if (!custom_install_path.empty()) {
-            makefile << "\tprefix := " << std::quoted(custom_install_path) << '\n';
+        auto files = generate(args.config);
+        if (args.command == "check") {
+            std::cout << args.config.string() << ": configuration and source discovery passed.\n";
+            return 0;
         }
 
-        makefile << "endif\n";
+        bool makefile_changed = write_changed(".polybuild.mk", files.makefile);
+        bool wrapper_changed = write_changed("Makefile", files.wrapper);
+        std::cout << (makefile_changed || wrapper_changed ? "Generated Makefile and .polybuild.mk.\n" : "Makefiles are unchanged.\n") << std::flush;
+        return 0;
+    } catch (const std::invalid_argument& error) {
+        std::cerr << "polybuild: " << error.what() << "\nRun 'polybuild --help' for usage.\n";
+        return 2;
+    } catch (const std::exception& error) {
+        std::cerr << "polybuild: " << error.what() << '\n';
+        return 1;
     }
-
-    makefile << "\nall: " << output_path << "$(out_ext)\n";
-    makefile << ".PHONY: all\n";
-
-    std::vector<std::filesystem::path> object_paths;
-    bool has_cpp = false;
-    for (std::filesystem::path source_path : source_paths) {
-        for (std::filesystem::directory_entry entry : SortedDirectoryIterator(source_path)) {
-            if (SourceFileType file_type; entry.is_regular_file() && (file_type = get_source_file_type(entry.path())) != SOURCE_FILE_NONE) {
-                std::filesystem::path object_path;
-                for (unsigned int i = 0;; ++i) {
-                    object_path = (std::filesystem::path(artifact_path) / (entry.path().stem().string() + '_' + std::to_string(i)));
-                    if (std::find(object_paths.begin(), object_paths.end(), object_path) != object_paths.end()) {
-                        continue;
-                    } else {
-                        object_paths.push_back(object_path);
-                        break;
-                    }
-                }
-                makefile << '\n'
-                         << object_path.generic_string() << "$(obj_ext): " << entry.path().generic_string() << " .polybuild.mk";
-
-                std::vector<std::filesystem::path> dependencies;
-                find_dependencies(entry.path(), include_paths, dependencies);
-                for (const auto& depdendency : dependencies) {
-                    makefile << ' ' << depdendency.generic_string();
-                }
-                makefile << '\n';
-
-                makefile << '\t' << echo("Compiling $@ from $<...") << '\n';
-                makefile << "\t@mkdir -p " << std::quoted(artifact_path) << '\n';
-                if (file_type == SOURCE_FILE_CPP) {
-                    makefile << "\t@$(cpp_compiler) $(compile_only_flag) \"$<\" $(cpp_compilation_flags) \"$(obj_path_flag)$@\"\n";
-                    has_cpp = true;
-                } else {
-                    makefile << "\t@$(c_compiler) $(compile_only_flag) \"$<\" $(c_compilation_flags) \"$(obj_path_flag)$@\"\n";
-                }
-                makefile << '\t' << echo("Finished compiling $@ from $<!") << '\n';
-            }
-        }
-    }
-
-    makefile << "\nobjects := ";
-    for (const auto& object_path : object_paths) {
-        makefile << ' ' << object_path.generic_string() << "$(obj_ext)";
-    }
-    makefile << '\n';
-
-    makefile << output_path << "$(out_ext): .polybuild.mk $(objects) $(static_libraries)\n";
-    makefile << "\t" << echo("Building $@...") << '\n';
-    {
-        auto path = std::filesystem::path(output_path);
-        if (path.has_parent_path()) {
-            makefile << "\t@mkdir -p " << std::quoted(path.parent_path().generic_string()) << '\n';
-        }
-    }
-    if (has_cpp) {
-        makefile << "\t@$(cpp_compiler) $(objects) $(static_libraries) $(cpp_compilation_flags) \"$(out_path_flag)$@\" $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
-    } else {
-        makefile << "\t@$(c_compiler) $(objects) $(static_libraries) $(c_compilation_flags) \"$(out_path_flag)$@\" $(link_flag) $(link_time_flags) $(libraries)\n\t" << echo("Finished building $@!") << '\n';
-    }
-
-    makefile << "\nclean:";
-    for (const auto& clean_prelude : clean_preludes) {
-        makefile << "\n\t" << echo("Executing clean prelude: " + clean_prelude);
-        makefile << "\n\t@" << clean_prelude;
-    }
-    makefile << "\n\t" << echo("Deleting " + output_path + "$(out_ext) and " + artifact_path + "...") << '\n';
-    makefile << "\t@rm -rf " << std::quoted(output_path + "$(out_ext)") << ' ' << std::quoted(artifact_path) << '\n';
-    makefile << '\t' << echo("Finished deleting " + output_path + "$(out_ext) and " + artifact_path + '!') << '\n';
-    makefile << ".PHONY: clean\n";
-
-    makefile << "\ninstall:\n";
-    makefile << '\t' << echo("Copying " + output_path + "$(out_ext) to $(prefix)...") << '\n';
-    makefile << "\t@cp " << std::quoted(output_path + "$(out_ext)") << " $(prefix)\n";
-    makefile << '\t' << echo("Finished copying " + output_path + "$(out_ext) to $(prefix)!") << '\n';
-    makefile << ".PHONY: install\n";
-
-    makefile.close();
-    std::cout << log("Finished converting Polybuild.toml to makefile!") << std::endl;
-
-    std::cout << log("Producing makefile wrapper...") << std::endl;
-    std::ofstream wrapper("Makefile");
-    wrapper << "# This file was auto-generated by Polybuild\n\n";
-
-    wrapper << "ifndef MODE\n";
-    wrapper << "\tMODE := release\n";
-    wrapper << "\texport MODE\n";
-    wrapper << "endif\n\n";
-
-    wrapper << "ifndef OS\n";
-    wrapper << "\tOS := $(shell uname)\n";
-    wrapper << "\texport OS\n";
-    wrapper << "endif\n\n";
-
-    wrapper << "ifeq ($(OS),Windows_NT)\n";
-    wrapper << "\tCC := cl\n";
-    wrapper << "\tCXX := cl\n";
-    wrapper << "\tCL := /nologo\n";
-    wrapper << "\tLINK := /nologo\n";
-    wrapper << "\tMSYS_NO_PATHCONV := 1\n";
-    wrapper << "\texport CC CXX CL MSYS_NO_PATHCONV\n";
-    wrapper << "endif\n";
-
-    wrapper << "\nall:";
-    for (unsigned int i = 0; i < preludes.size(); ++i) {
-        wrapper << " prelude" << i;
-    }
-    wrapper << "\n\t@\"$(MAKE)\" -f .polybuild.mk --no-print-directory\n";
-    wrapper << ".PHONY: all\n";
-
-    for (unsigned int i = 0; i < preludes.size(); ++i) {
-        wrapper << "\nprelude" << i << ":\n";
-        wrapper << '\t' << echo("Executing prelude: " + preludes[i]) << '\n';
-        wrapper << "\t@" << preludes[i] << '\n';
-        wrapper << ".PHONY: prelude" << i << '\n';
-    }
-
-    wrapper << "\nclean:\n";
-    wrapper << "\t@\"$(MAKE)\" -f .polybuild.mk --no-print-directory $@\n";
-    wrapper << ".PHONY: clean\n";
-
-    wrapper << "\ninstall:\n";
-    wrapper << "\t@\"$(MAKE)\" -f .polybuild.mk --no-print-directory $@\n";
-    wrapper << ".PHONY: install\n";
-
-    wrapper.close();
-    std::cout << log("Finished producing makefile wrapper!") << std::endl;
-
-    return 0;
 }
