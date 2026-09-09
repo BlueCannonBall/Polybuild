@@ -33,9 +33,13 @@ struct EnvBlock {
     const toml::value* table;
 };
 
-void validate_build_path(const std::string& path) {
+void validate_build_path(const std::string& path, const toml::value* value = nullptr) {
     if (path.empty() || path.find_first_of("\t\r\n$#:%*?[];|&<>`\\\"'") != std::string::npos) {
-        throw std::runtime_error("Unsupported build path: " + path + ". Use paths without tabs, newlines, or Make/shell metacharacters.");
+        std::string message = "Unsupported build path: " + path + ". Use paths without tabs, newlines, or Make/shell metacharacters.";
+        if (value) {
+            message = toml::format_error(message, *value, "invalid build path");
+        }
+        throw std::runtime_error(message);
     }
 }
 
@@ -48,7 +52,7 @@ void validate_table(const toml::value& table, const std::vector<std::string>& st
         } else if (std::find(booleans.begin(), booleans.end(), entry.first) != booleans.end()) {
             entry.second.as_boolean();
         } else {
-            throw std::runtime_error("Unknown configuration key: " + entry.first);
+            throw std::runtime_error(toml::format_error("Unknown configuration key: " + entry.first, entry.second, "unknown key"));
         }
     }
 }
@@ -76,18 +80,18 @@ void validate_config(const toml::value& config, bool is_override = false) {
                 if (variable.first.empty() ||
                     (variable.first.front() >= '0' && variable.first.front() <= '9') ||
                     variable.first.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789") != std::string::npos) {
-                    throw std::runtime_error("Invalid environment variable: " + variable.first);
+                    throw std::runtime_error(toml::format_error("Invalid environment variable: " + variable.first, variable.second, "invalid environment variable name"));
                 }
 
                 for (const auto& value : variable.second.as_table()) {
                     if (value.first.find_first_of("\r\n(),$") != std::string::npos) {
-                        throw std::runtime_error("Invalid environment condition: " + value.first);
+                        throw std::runtime_error(toml::format_error("Invalid environment condition: " + value.first, value.second, "invalid environment condition"));
                     }
                     validate_config(value.second, true);
                 }
             }
         } else {
-            throw std::runtime_error("Unknown configuration table: " + entry.first);
+            throw std::runtime_error(toml::format_error("Unknown configuration table: " + entry.first, entry.second, "unknown table"));
         }
     }
 }
@@ -253,8 +257,10 @@ GeneratedFiles generate(const std::filesystem::path& config_path) {
     auto is_shared = toml::find_or<bool>(options_table, "shared", false);
     auto is_static = toml::find_or<bool>(options_table, "static", false);
 
-    validate_build_path(output_path);
-    validate_build_path(artifact_path);
+    validate_build_path(output_path, &toml::find(paths_table, "output"));
+    if (auto it = paths_table.as_table().find("artifact"); it != paths_table.as_table().end()) {
+        validate_build_path(artifact_path, &it->second);
+    }
 
     std::vector<EnvBlock> env_blocks;
     auto env_table = toml::find_or<toml::table>(config, "env", {});

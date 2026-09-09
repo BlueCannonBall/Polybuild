@@ -77,6 +77,29 @@ class PolybuildTests(unittest.TestCase):
         self.cli("check", success=False)
         self.assertEqual(before, (self.root / ".polybuild.mk").read_bytes())
 
+    def test_configuration_errors_have_source_context(self):
+        self.cli()
+        before = [(self.root / name).read_bytes() for name in ("Makefile", ".polybuild.mk")]
+        cases = [
+            (self.config + '[options]\nstatci = true\n', "Unknown configuration key: statci", "statci = true"),
+            (self.config + '[unknown]\nvalue = true\n', "Unknown configuration table: unknown", "[unknown]"),
+            (self.config + '[env."bad-name".yes]\noptions.static = true\n', "Invalid environment variable: bad-name", '[env."bad-name".yes]'),
+            (self.config + '[env.MODE."bad,value"]\noptions.static = true\n', "Invalid environment condition: bad,value", '[env.MODE."bad,value"]'),
+            (self.config.replace('output = "app"', 'output = "bad#path"'), "Unsupported build path: bad#path", 'output = "bad#path"'),
+            (self.config + 'artifact = "bad#path"\n', "Unsupported build path: bad#path", 'artifact = "bad#path"'),
+            (self.config + '[options]\nstatic = "yes"\n', "bad_cast to boolean", 'static = "yes"'),
+        ]
+        for config, message, source_line in cases:
+            with self.subTest(message=message, source_line=source_line):
+                self.write("Polybuild.toml", config)
+                result = self.cli(success=False)
+                self.assertIn(message, result.stdout)
+                self.assertIn("--> Polybuild.toml", result.stdout)
+                line_number = config.splitlines().index(source_line) + 1
+                self.assertIn(f"{line_number} | {source_line}", result.stdout)
+                self.assertIn("~", result.stdout)
+                self.assertEqual(before, [(self.root / name).read_bytes() for name in ("Makefile", ".polybuild.mk")])
+
     def test_temporary_path_collisions_preserve_existing_files(self):
         for name in (".polybuild.mk", "Makefile", "Other.toml"):
             for directory in (False, True):
