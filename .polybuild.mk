@@ -57,12 +57,16 @@ is_static := false
 library_paths :=
 libraries :=
 pkg_config_libraries :=
-prefix := "/usr/local/bin"
+define prefix :=
+/usr/local/bin
+endef
 
 ifeq ($(OS),Windows_NT)
 	cpp_compilation_flags := /W3 /std:c++17 /EHsc /O2
 	is_static := true
-	prefix := "C:\\Windows\\System32"
+	define prefix :=
+C:\Windows\System32
+endef
 endif
 
 active_linkage_flag := $(active_dynamic_flag)
@@ -108,6 +112,6 @@ clean:
 
 install:
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Copying polybuild$(out_ext) to $(prefix)..."
-	@cp "polybuild$(out_ext)" $(prefix)
+	@cp "polybuild$(out_ext)" "$(prefix)"
 	@printf "\033[1m[POLYBUILD]\033[0m %s\n" "Finished copying polybuild$(out_ext) to $(prefix)!"
 .PHONY: install

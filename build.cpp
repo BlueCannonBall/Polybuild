@@ -34,8 +34,8 @@ struct EnvBlock {
 };
 
 void validate_build_path(const std::string& path) {
-    if (path.empty() || path.find_first_of(" \t\r\n$#:%*?[];|&<>`\\\"'") != std::string::npos) {
-        throw std::runtime_error("Unsupported build path: " + path + ". Use paths without whitespace or Make/shell metacharacters.");
+    if (path.empty() || path.find_first_of("\t\r\n$#:%*?[];|&<>`\\\"'") != std::string::npos) {
+        throw std::runtime_error("Unsupported build path: " + path + ". Use paths without tabs, newlines, or Make/shell metacharacters.");
     }
 }
 
@@ -191,6 +191,17 @@ std::vector<SourceFile> find_sources(const std::vector<std::string>& source_path
 
     if (ret.empty()) {
         throw std::runtime_error("No C or C++ source files found in paths.source.");
+    }
+    return ret;
+}
+
+std::string quote_make(const std::string& str) {
+    std::string ret;
+    for (char c : str) {
+        if (c == ' ') {
+            ret += '\\';
+        }
+        ret += c;
     }
     return ret;
 }
@@ -354,13 +365,13 @@ GeneratedFiles generate(const std::filesystem::path& config_path) {
     if (!static_libraries.empty()) {
         makefile << "static_libraries :=";
         for (const auto& static_library : static_libraries) {
-            makefile << ' ' << static_library;
+            makefile << ' ' << quote_make(static_library);
         }
         makefile << '\n';
     }
 
     if (!install_path.empty()) {
-        makefile << "prefix := " << std::quoted(install_path) << '\n';
+        makefile << "define prefix :=\n" << install_path << "\nendef\n";
     }
 
     for (const auto& env_block : env_blocks) {
@@ -421,13 +432,13 @@ GeneratedFiles generate(const std::filesystem::path& config_path) {
             auto custom_static_libraries = toml::get<std::vector<std::string>>(it->second);
             makefile << "\tstatic_libraries :=";
             for (const auto& static_library : custom_static_libraries) {
-                makefile << ' ' << static_library;
+                makefile << ' ' << quote_make(static_library);
             }
             makefile << '\n';
         }
 
         if (auto it = custom_paths_table.find("install"); it != custom_paths_table.end()) {
-            makefile << "\tprefix := " << std::quoted(toml::get<std::string>(it->second)) << '\n';
+            makefile << "\tdefine prefix :=\n" << toml::get<std::string>(it->second) << "\nendef\n";
         }
         makefile << "endif\n";
     }
@@ -447,15 +458,15 @@ GeneratedFiles generate(const std::filesystem::path& config_path) {
     makefile << "\tlibraries += `pkg-config $(pkg_config_syntax) --libs $(pkg_config_libraries)`\n";
     makefile << "endif\n";
 
-    makefile << "\nall: " << output_path << "$(out_ext)\n";
+    makefile << "\nall: " << quote_make(output_path) << "$(out_ext)\n";
     makefile << ".PHONY: all\n";
 
     bool has_cpp = false;
     for (const auto& source : sources) {
         makefile << '\n'
-                 << source.object_path.generic_string() << "$(obj_ext): " << source.path.generic_string() << " .polybuild.mk";
+                 << quote_make(source.object_path.generic_string()) << "$(obj_ext): " << quote_make(source.path.generic_string()) << " .polybuild.mk";
         for (const auto& dependency : source.dependencies) {
-            makefile << ' ' << dependency.generic_string();
+            makefile << ' ' << quote_make(dependency.generic_string());
         }
         makefile << '\n';
 
@@ -472,11 +483,11 @@ GeneratedFiles generate(const std::filesystem::path& config_path) {
 
     makefile << "\nobjects := ";
     for (const auto& source : sources) {
-        makefile << ' ' << source.object_path.generic_string() << "$(obj_ext)";
+        makefile << ' ' << quote_make(source.object_path.generic_string()) << "$(obj_ext)";
     }
     makefile << '\n';
 
-    makefile << output_path << "$(out_ext): .polybuild.mk $(objects) $(static_libraries)\n";
+    makefile << quote_make(output_path) << "$(out_ext): .polybuild.mk $(objects) $(static_libraries)\n";
     makefile << "\t" << echo("Building $@...") << '\n';
     {
         auto path = std::filesystem::path(output_path);
@@ -504,7 +515,7 @@ GeneratedFiles generate(const std::filesystem::path& config_path) {
 
     makefile << "\ninstall:\n";
     makefile << '\t' << echo("Copying " + output_path + "$(out_ext) to $(prefix)...") << '\n';
-    makefile << "\t@cp " << std::quoted(output_path + "$(out_ext)") << " $(prefix)\n";
+    makefile << "\t@cp " << std::quoted(output_path + "$(out_ext)") << " \"$(prefix)\"\n";
     makefile << '\t' << echo("Finished copying " + output_path + "$(out_ext) to $(prefix)!") << '\n';
     makefile << ".PHONY: install\n";
 

@@ -65,7 +65,7 @@ make -C my-project MODE=debug -j8
 
 Polybuild never invokes Make or a compiler. Generated recipes require GNU Make and a POSIX shell with standard utilities, including on Windows (for example, an MSYS environment with the compiler available).
 
-Generation validates the entire configuration and discovers sources before writing either Makefile. Unknown keys, incorrect value types, inaccessible source directories, and empty source sets are errors. The current Makefile format requires source, discovered header, artifact, and output paths without whitespace or Make/shell metacharacters. Installation prefixes may contain spaces.
+Generation validates the entire configuration and discovers sources before writing either Makefile. Unknown keys, incorrect value types, inaccessible source directories, and empty source sets are errors. Paths may contain spaces, including source files, headers, artifacts, outputs, libraries, and installation prefixes. Tabs, newlines, and Make/shell metacharacters in build paths are still unsupported.
 
 Identical generated files are left untouched, including their timestamps. Changed files are each replaced atomically.
 

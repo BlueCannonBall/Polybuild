@@ -81,6 +81,10 @@ def write_project(root, config):
     (root / "Polybuild.toml").write_bytes(config.encode())
 
 
+def rule_tokens(contents):
+    return [shlex.split(line.decode()) if line.startswith(b"\t") else line for line in contents.splitlines()]
+
+
 class MakefileOutputTests(unittest.TestCase):
     def test_original_rules_and_commands(self):
         fixtures = Path(__file__).parent / "fixtures" / "makefiles"
@@ -99,7 +103,7 @@ class MakefileOutputTests(unittest.TestCase):
                         self.assertEqual(expected, actual, filename)
                     else:
                         self.assertEqual(expected.split(b"c_compiler :=", 1)[0], actual.split(b"c_compiler :=", 1)[0])
-                        self.assertEqual(expected.split(b"\nall:", 1)[1], actual.split(b"\nall:", 1)[1])
+                        self.assertEqual(rule_tokens(expected.split(b"\nall:", 1)[1]), rule_tokens(actual.split(b"\nall:", 1)[1]))
                         (root / "Original.mk").write_bytes(expected)
 
                 for library in ("lib/first.a", "lib/second.a", "winlib/first.lib"):

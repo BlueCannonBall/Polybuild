@@ -1,3 +1,3 @@
 These fixtures were generated with the original main.cpp and util.hpp from commit deb9b2921144a4e5c44c066d2bc4ab9dd7f8f311 on Linux. Inputs are defined in tests/test_makefile_output.py. Expected bytes must come from that original generator, not the implementation under test.
 
-Environment settings now compose instead of restoring base values. The tests retain these original fixtures to compare the wrapper, platform setup, and build rules byte for byte, and expanded build commands when at most one override matches. Combinations of overrides are covered by separate behavioral tests.
+Environment settings now compose instead of restoring base values. The tests retain these original fixtures to compare the wrapper and platform setup byte for byte, target and prerequisite text exactly, and recipe shell tokens. Expanded build commands are compared when at most one override matches. Combinations of overrides are covered by separate behavioral tests.

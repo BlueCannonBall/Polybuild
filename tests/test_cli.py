@@ -3,6 +3,7 @@
 import json
 import os
 import shlex
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -251,6 +252,86 @@ options.static = false
         before = obj.stat().st_mtime_ns
         self.run_command("make")
         self.assertEqual(before, obj.stat().st_mtime_ns)
+
+    def test_spaces_in_paths(self):
+        original_root = self.root
+        for extension, compiler in (("c", "cc"), ("cpp", "c++")):
+            with self.subTest(extension=extension):
+                self.root = original_root / ("project " + extension)
+                self.root.mkdir()
+                for directory in ("source files", "include files", "library files", "compiler tools", " installed files"):
+                    (self.root / directory).mkdir()
+                compiler_path = self.root / "compiler tools" / "my compiler"
+                compiler_path.write_text("#!/bin/sh\nexec " + shlex.quote(shutil.which(compiler)) + ' "$@"\n')
+                compiler_path.chmod(0o755)
+                self.write("include files/nested header.h", "#define VALUE 1\n")
+                self.write("include files/main header.h", '#include "nested header.h"\n')
+                self.write("source files/main file." + extension, '#include <stdio.h>\n#include <main header.h>\n'
+                           '#ifdef __cplusplus\nextern "C" {\n#endif\n'
+                           'int archived(void); int named(void);\n#ifdef __cplusplus\n}\n#endif\n'
+                           'int extra(void);\nint main(void) { printf("%d\\n", VALUE + extra() + archived() + named()); }\n')
+                self.write(" extra  file." + extension, "int extra(void) { return 1; }\n")
+                for filename, function, value in (("static library", "archived", 10), ("override library", "archived", 20), ("libnamed library", "named", 100)):
+                    self.write("library files/library.c", f"int {function}(void) {{ return {value}; }}\n")
+                    self.run_command("cc", "-c", "library files/library.c", "-o", "library files/library.o")
+                    self.run_command("ar", "rcs", f"library files/{filename}.a", "library files/library.o")
+                self.write("Build config.toml", '[paths]\noutput = "output files/my app"\n'
+                           'artifact = "object files"\nsource = ["source files", " extra  file.' + extension + '"]\n'
+                           'include = ["include files"]\nlibrary = ["library files"]\ninstall = " installed files"\n'
+                           '[options]\nc-compiler = ' + json.dumps(str(compiler_path)) + '\n'
+                           'cpp-compiler = ' + json.dumps(str(compiler_path)) + '\n'
+                           'libraries = ["named library"]\nstatic-libraries = ["library files/static library.a"]\n'
+                           '[env.USE_OVERRIDE.yes]\noptions.static-libraries = ["library files/override library.a"]\n')
+                self.cli("--config", "Build config.toml")
+                commands = self.run_command("make", "-n", "OS=Windows_NT").stdout
+                arguments = [shlex.split(line) for line in commands.splitlines()]
+                compilations = [args for args in arguments if "/c" in args]
+                self.assertEqual(len(compilations), 2)
+                self.assertIn("source files/main file." + extension, compilations[0])
+                self.assertIn("/Fo:object files/main file_0.obj", compilations[0])
+                link = next(args for args in arguments if "/Fe:output files/my app.exe" in args)
+                self.assertIn("object files/ extra  file_0.obj", link)
+                self.assertIn("library files/static library.a", link)
+                self.run_command("make", "-j2")
+                self.assertEqual(self.run_command("./output files/my app").stdout.strip(), "112")
+                objects = list((self.root / "object files").iterdir())
+                before = [path.stat().st_mtime_ns for path in objects]
+                self.run_command("make", "-j2")
+                self.assertEqual(before, [path.stat().st_mtime_ns for path in objects])
+                self.write("include files/nested header.h", "#define VALUE 2\n")
+                self.run_command("make", "-j2")
+                self.assertEqual(self.run_command("./output files/my app").stdout.strip(), "113")
+                (self.root / "output files/my app").unlink()
+                self.run_command("make", "USE_OVERRIDE=yes")
+                self.assertEqual(self.run_command("./output files/my app").stdout.strip(), "123")
+                self.write("library files/library.c", "int archived(void) { return 30; }\n")
+                self.run_command("cc", "-c", "library files/library.c", "-o", "library files/library.o")
+                self.run_command("ar", "rcs", "library files/override library.a", "library files/library.o")
+                self.run_command("make", "USE_OVERRIDE=yes")
+                self.assertEqual(self.run_command("./output files/my app").stdout.strip(), "133")
+                self.run_command("make", "install")
+                self.assertEqual((self.root / "output files/my app").read_bytes(), (self.root / " installed files/my app").read_bytes())
+                self.run_command("make", "install", "prefix=./ installed files/another app")
+                self.assertTrue((self.root / " installed files/another app").is_file())
+                self.run_command("make", "clean")
+                self.assertFalse((self.root / "object files").exists())
+                self.assertFalse((self.root / "output files/my app").exists())
+        self.root = original_root
+
+    def test_shared_library_with_spaces(self):
+        self.write("main.c", "int value(void) { return 1; }\n")
+        output = self.root / "shared libraries" / "my library"
+        artifact = self.root / "shared objects"
+        self.write("Polybuild.toml", '[paths]\noutput = ' + json.dumps(str(output)) + '\n'
+                   'artifact = ' + json.dumps(str(artifact)) + '\nsource = ["main.c"]\n'
+                   '[options]\nshared = true\n')
+        self.cli()
+        self.run_command("make", "-j2")
+        self.assertTrue(output.with_suffix(".so").is_file())
+        self.assertTrue((artifact / "main_0.o").is_file())
+        self.run_command("make", "clean")
+        self.assertFalse(output.with_suffix(".so").exists())
+        self.assertFalse(artifact.exists())
 
     def test_unreadable_sources_preserve_makefiles(self):
         self.write("main.c", '#include "first.h"\nint main(void) { return 0; }\n')
