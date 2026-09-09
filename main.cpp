@@ -72,8 +72,13 @@ bool write_changed(const std::filesystem::path& path, const std::string& content
     }
     existing.close();
 
-    auto temporary_path = path;
-    temporary_path += ".tmp";
+    auto temporary_directory = path;
+    temporary_directory += ".tmp";
+    auto temporary_path = temporary_directory / path.filename();
+    if (!std::filesystem::create_directory(temporary_directory)) {
+        throw std::runtime_error("Temporary path already exists: " + temporary_directory.string());
+    }
+
     try {
         std::ofstream file;
         file.exceptions(std::ios::failbit | std::ios::badbit);
@@ -81,9 +86,11 @@ bool write_changed(const std::filesystem::path& path, const std::string& content
         file << contents;
         file.close();
         std::filesystem::rename(temporary_path, path);
+        std::filesystem::remove(temporary_directory);
     } catch (...) {
         std::error_code error;
         std::filesystem::remove(temporary_path, error);
+        std::filesystem::remove(temporary_directory, error);
         throw;
     }
     return true;

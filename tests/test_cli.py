@@ -76,6 +76,59 @@ class PolybuildTests(unittest.TestCase):
         self.cli("check", success=False)
         self.assertEqual(before, (self.root / ".polybuild.mk").read_bytes())
 
+    def test_temporary_path_collisions_preserve_existing_files(self):
+        for name in (".polybuild.mk", "Makefile", "Other.toml"):
+            for directory in (False, True):
+                with self.subTest(name=name, directory=directory):
+                    target = self.root / name
+                    temporary = self.root / (name + ".tmp")
+                    if name == "Other.toml":
+                        command = ("init", "--config", name)
+                    else:
+                        target.write_text("original output\n")
+                        command = ("generate",)
+                    if directory:
+                        temporary.mkdir()
+                        contents = temporary / name
+                    else:
+                        contents = temporary
+                    contents.write_text("existing temporary contents\n")
+                    try:
+                        self.cli(*command, success=False)
+                        self.assertEqual(contents.read_text(), "existing temporary contents\n")
+                        if name == "Other.toml":
+                            self.assertFalse(target.exists())
+                        else:
+                            self.assertEqual(target.read_text(), "original output\n")
+                    finally:
+                        contents.unlink()
+                        if directory:
+                            temporary.rmdir()
+                    self.cli(*command)
+                    self.assertFalse(temporary.exists())
+                    if name == "Other.toml":
+                        target.unlink()
+
+    def test_temporary_symlinks_are_preserved(self):
+        directory = self.root / "existing-directory"
+        directory.mkdir()
+        marker = directory / ".polybuild.mk"
+        marker.write_text("keep this file\n")
+        missing = self.root / "missing"
+        temporary = self.root / ".polybuild.mk.tmp"
+        for target in (directory, missing):
+            try:
+                temporary.symlink_to(target, target_is_directory=target == directory)
+            except OSError:
+                self.skipTest("Creating symlinks is unavailable on this system")
+            try:
+                self.cli("generate", success=False)
+                self.assertTrue(temporary.is_symlink())
+                self.assertEqual(marker.read_text(), "keep this file\n")
+                self.assertFalse(missing.exists())
+            finally:
+                temporary.unlink()
+
     def test_init_and_directory_config_options(self):
         self.cli("-C", str(self.root), "init", "--config", "Other.toml")
         before = (self.root / "Other.toml").read_bytes()
