@@ -73,7 +73,7 @@ Exit status is zero on success, 2 for invalid CLI arguments, and 1 for configura
 
 ## Portable Makefiles
 
-The generated files can be committed to Git and used without Polybuild installed. The header scanner deliberately follows literal includes in every preprocessor branch, including inactive `#ifdef` branches. Generation does not select the host's active branches or invoke a compiler to discover dependencies. Environment overrides remain Make conditionals evaluated at build time.
+The generated files can be committed to Git and used without Polybuild installed. The header scanner deliberately follows literal includes in every preprocessor branch, including inactive `#ifdef` branches. Generation does not select the host's active branches or invoke a compiler to discover dependencies. Environment overrides remain Make conditionals evaluated at build time. Matching blocks apply in configuration order and change only the settings they specify. Later assignments to the same setting win; empty strings and lists clear earlier values.
 
 Rerun `polybuild generate` after changing the configuration, adding/removing sources, or changing the include graph. Macro-expanded includes are not discovered by the scanner, and referenced headers must be available during generation to be recorded.
 

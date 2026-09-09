@@ -2,6 +2,7 @@
 
 import json
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import tempfile
@@ -90,6 +91,81 @@ class PolybuildTests(unittest.TestCase):
         self.run_command("make")
         self.run_command("make", "install", "DEST=test")
         self.assertEqual((self.root / "app").read_bytes(), destination.read_bytes())
+
+    def test_environment_overrides_compose_in_builds(self):
+        self.write("Polybuild.toml", self.config + '''[options]
+c-compiler = "missing-compiler"
+link-time-flags = "invalid-link-flags"
+[env.FEATURE.on.options]
+c-compiler = "cc"
+c-compilation-flags = "-DVALUE=2"
+[env.MODE.debug.options]
+link-time-flags = ""
+[env.EXTRA.on.options]
+c-compilation-flags = "-DVALUE=3"
+''')
+        self.cli("generate")
+        for extra, value in (("off", "2"), ("on", "3")):
+            self.run_command("make", "-B", "FEATURE=on", "MODE=debug", f"EXTRA={extra}")
+            self.assertEqual(self.run_command("./app").stdout.strip(), value)
+
+    def test_environment_overrides_compose_and_clear_flags(self):
+        self.write("extra.cpp", "int extra() { return 0; }\n")
+        self.write("custom.a", "")
+        self.write("Polybuild.toml", self.config + '''include = ["include"]
+[options]
+shared = true
+[env.PLATFORM.windows]
+paths.library = ["custom libs"]
+paths.install = "custom prefix"
+options.c-compiler = "cl"
+options.compiler = "unused-alias"
+options.cpp-compiler = "clang-cl"
+options.c-compilation-flags = "/DCUSTOM_C"
+options.libraries = ["custom.lib"]
+options.static-libraries = ["custom.a"]
+options.pkg-config-libraries = ["custom-pkg"]
+options.static = true
+[env.MODE.debug.options]
+compilation-flags = "unused-alias"
+cpp-compilation-flags = "/DCUSTOM_CPP"
+link-time-flags = "/CUSTOM_LINK"
+[env.CLEAR.yes]
+paths.library = []
+paths.install = ""
+options.c-compilation-flags = ""
+options.cpp-compilation-flags = ""
+options.link-time-flags = ""
+options.libraries = []
+options.static-libraries = []
+options.pkg-config-libraries = []
+options.static = false
+''')
+        self.cli("generate")
+        for clear in ("no", "yes"):
+            with self.subTest(clear=clear):
+                args = ("OS=Windows_NT", "PLATFORM=windows", "MODE=debug", f"CLEAR={clear}")
+                result = self.run_command("make", "-n", "-f", ".polybuild.mk", "all", *args)
+                commands = [shlex.split(line) for line in result.stdout.splitlines()]
+                commands = [command for command in commands if command[0] in ("cl", "clang-cl")]
+                self.assertEqual(len(commands), 3)
+                c_command = next(command for command in commands if command[0] == "cl")
+                cpp_command = next(command for command in commands if command[0] == "clang-cl" and "/c" in command)
+                link_command = next(command for command in commands if "/c" not in command)
+                for command in commands:
+                    for flag in ("/Zi", "/Iinclude", "/LD", "/MDd" if clear == "yes" else "/MTd"):
+                        self.assertIn(flag, command)
+                    self.assertEqual("--cflags" in command, clear == "no")
+                    self.assertEqual("custom-pkg`" in command, clear == "no")
+                    self.assertNotIn("unused-alias", command)
+                self.assertEqual("/DCUSTOM_C" in c_command, clear == "no")
+                self.assertEqual("/DCUSTOM_CPP" in cpp_command, clear == "no")
+                self.assertEqual("/DCUSTOM_CPP" in link_command, clear == "no")
+                for flag in ("/CUSTOM_LINK", "/LIBPATH:custom libs", "custom.lib", "custom.a", "--libs"):
+                    self.assertEqual(flag in link_command, clear == "no", flag)
+                self.assertIn("/DEBUG", link_command)
+                result = self.run_command("make", "-n", "-f", ".polybuild.mk", "install", *args)
+                self.assertIn('cp "app.dll" ' + ('""' if clear == "yes" else '"custom prefix"'), result.stdout)
 
     def test_environment_variable_names(self):
         for name in ("_", "a", "Z_90", "_VAR", "", "0ABC", "space name", "a-b", "é"):

@@ -50,20 +50,33 @@ endif
 
 c_compiler := "$(CC)"
 cpp_compiler := "$(CXX)"
-c_compilation_flags := $(CFLAGS) $(active_debug_compilation_flag) $(active_dynamic_flag)
-cpp_compilation_flags := -Wall -std=c++17 -O3 $(active_debug_compilation_flag) $(active_dynamic_flag)
-link_time_flags := $(LDFLAGS) $(active_debug_link_flag)
+c_compilation_flags := $(CFLAGS)
+cpp_compilation_flags := -Wall -std=c++17 -O3
+link_time_flags := $(LDFLAGS)
+is_static := false
+library_paths :=
 libraries :=
+pkg_config_libraries :=
 prefix := "/usr/local/bin"
 
 ifeq ($(OS),Windows_NT)
-	c_compiler := "$(CC)"
-	cpp_compiler := "$(CXX)"
-	c_compilation_flags := $(CFLAGS) $(active_debug_compilation_flag) $(active_static_flag)
-	cpp_compilation_flags := /W3 /std:c++17 /EHsc /O2 $(active_debug_compilation_flag) $(active_static_flag)
-	link_time_flags := $(LDFLAGS) $(active_debug_link_flag)
-	libraries :=
+	cpp_compilation_flags := /W3 /std:c++17 /EHsc /O2
+	is_static := true
 	prefix := "C:\\Windows\\System32"
+endif
+
+active_linkage_flag := $(active_dynamic_flag)
+ifeq ($(is_static),true)
+	active_linkage_flag := $(active_static_flag)
+endif
+
+c_compilation_flags += $(active_debug_compilation_flag) $(active_linkage_flag)
+cpp_compilation_flags += $(active_debug_compilation_flag) $(active_linkage_flag)
+link_time_flags += $(active_debug_link_flag) $(library_paths)
+ifneq ($(strip $(pkg_config_libraries)),)
+	c_compilation_flags += `pkg-config $(pkg_config_syntax) --cflags $(pkg_config_libraries)`
+	cpp_compilation_flags += `pkg-config $(pkg_config_syntax) --cflags $(pkg_config_libraries)`
+	libraries += `pkg-config $(pkg_config_syntax) --libs $(pkg_config_libraries)`
 endif
 
 all: polybuild$(out_ext)
